@@ -562,7 +562,7 @@ const Core = (function () {
     for (const it of drops) {
       if (!it.lock && p.autoSalvage && it.rar < p.autoSalvage) { p.shards += salvageValue(it); log('salv', `Auto-salvaged ${it.name} (+${salvageValue(it)} shards).`); continue; }
       if (p.inv.length >= 60) { p.gold += itemValue(it); log('salv', `Bag full. Sold ${it.name} for ${fmt(itemValue(it))}.`); continue; }
-      p.inv.push(it); log('loot', `Looted [${RARITIES[it.rar].name}] ${it.name} +0 (iLvl ${it.ilvl}).`, it.rar);
+      p.inv.push(it); (b.loot = b.loot || []).push(it); log('loot', `Looted [${RARITIES[it.rar].name}] ${it.name} +0 (iLvl ${it.ilvl}).`, it.rar);
     }
     if (e.boss) {
       p.stats.bosses++;

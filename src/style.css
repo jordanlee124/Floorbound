@@ -165,3 +165,15 @@ label { font-size: 13px; color: var(--dim); }
 @media (max-width: 900px) {
   .actionbar { position: sticky; bottom: 0; z-index: 5; margin-inline: -14px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--panel); border-top: 1px solid var(--line); }
 }
+
+/* loot popup: bottom-right card on desktop, sits above the Fight bar on phones */
+.lootpop { position: fixed; z-index: 20; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(340px, calc(100vw - 32px)); max-height: 70vh; overflow-y: auto;
+  display: grid; gap: 7px; padding: 12px 14px; background: var(--panel2); border: 1px solid var(--ember); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); animation: lp-in .18s ease-out; }
+.lootpop h3 { display: grid; }
+.lootpop h3 small { color: var(--dim); font-weight: 400; }
+.lootpop .cmp { grid-template-columns: 1fr; }
+.lp-head { display: flex; justify-content: space-between; align-items: center; font: 600 12px/1 var(--body); text-transform: uppercase; letter-spacing: .12em; color: var(--ember); }
+.lp-x { padding: 2px 9px; font-size: 18px; line-height: 1; }
+@keyframes lp-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 900px) { .lootpop { left: 16px; right: 16px; width: auto; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); max-height: 55vh; } }
+@media (prefers-reduced-motion: reduce) { .lootpop { animation: none; } }

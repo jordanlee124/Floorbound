@@ -6,7 +6,7 @@ import Core from './core.js';
   const $ = s => document.querySelector(s);
   const SAVE_KEY = 'floorbound.save.v1';
   // fighting: a battle is playing out. cooldown: short pause after a fight so the last hit stays readable.
-  let P, B, fighting = false, cooldown = 0, speed = 1, tab = 'gear', selId = null, logLines = [], dirty = true, confirmKey = null;
+  let P, B, fighting = false, cooldown = 0, lootQueue = [], tab = 'gear', selId = null, logLines = [], dirty = true, confirmKey = null;
 
   const RCOL = ['r0', 'r1', 'r2', 'r3', 'r4'];
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -54,14 +54,14 @@ import Core from './core.js';
 
   function loop() {
     if (cooldown > 0) { cooldown -= 0.1; if (cooldown <= 0) { cooldown = 0; nextEnemy(); renderControls(); } }
-    if (fighting) for (let i = 0; i < speed && fighting; i++) step();
+    if (fighting) step();
     renderBattle();
     if (dirty) { renderPanels(); dirty = false; }
   }
   function step() {
     const r = C.tick(B, P);
     if (!r) return;
-    if (r === 'win') C.onWin(P, B, log);
+    if (r === 'win') { C.onWin(P, B, log); if (B.loot) { lootQueue.push(...B.loot.map(it => it.id)); renderLoot(); } }
     else { C.onLose(P, B, log); log('floor', 'Adjust your build, or drop a floor and grind.'); }
     fighting = false; cooldown = 0.6; dirty = true;
     save(); renderControls();
@@ -163,6 +163,28 @@ import Core from './core.js';
     const warn = basicNow !== basicNew ? `<p class="warn">Basic attacks become ${basicNew === 'magic' ? 'magic (scale with Magic)' : 'physical (scale with Attack)'}.</p>` : '';
     return `<p class="muted">If equipped, vs. ${P.equip[it.slot] ? 'current ' + C.SLOT_NAME[it.slot].toLowerCase() : 'empty slot'}:</p><ul class="cmp">${rows || '<li><span>No change</span></li>'}</ul>${warn}`;
   }
+  function propsHtml(it) {
+    const st = C.itemStats(it);
+    return `<ul class="props">${Object.keys(it.base).map(k => `<li>${statLine(k, st[k] - (it.aff[k] || 0))}${it.enh && ['atk', 'matk', 'hp', 'def', 'mres', 'eva'].includes(k) ? ' <small class="muted">(enhanced)</small>' : ''}</li>`).join('')}
+      ${Object.keys(it.aff).map(k => `<li class="aff">${statLine(k, it.aff[k])}</li>`).join('')}</ul>`;
+  }
+  // Popup for the oldest unseen drop. Items already equipped, salvaged or sold elsewhere are skipped.
+  function renderLoot() {
+    const box = $('#lootpop');
+    while (lootQueue.length && !P.inv.some(x => x.id === lootQueue[0])) lootQueue.shift();
+    if (!lootQueue.length) { box.hidden = true; box.innerHTML = ''; return; }
+    const it = P.inv.find(x => x.id === lootQueue[0]);
+    box.innerHTML = `<div class="lp-head"><span>Item found${lootQueue.length > 1 ? ` <small class="muted">1 of ${lootQueue.length}</small>` : ''}</span>
+        <button class="lp-x" data-act="loot-close" aria-label="Keep in bag and close">×</button></div>
+      <h3>${itemCard(it)}</h3>
+      ${it.wtype ? `<p class="muted">${it.wtype}: ${C.WEAPONS[it.wtype].kind === 'magic' ? 'magic' : 'physical'} basic attacks, ${Math.round(C.WEAPONS[it.wtype].spd * 100)}% attack speed</p>` : ''}
+      ${propsHtml(it)}
+      ${compareHtml(it)}
+      <div class="row"><button class="pri" data-act="loot-eq" data-id="${it.id}">Equip</button>
+        <button data-act="loot-close">Keep in bag</button>
+        <button data-act="loot-salv" data-id="${it.id}">Salvage (+${C.salvageValue(it)})</button></div>`;
+    box.hidden = false;
+  }
   function gearPanel() {
     const sel = selId && C.findItem(P, selId);
     const slots = C.SLOTS.map(s => {
@@ -178,15 +200,12 @@ import Core from './core.js';
     let detail = '<p class="muted">Select an item to see its stats, compare it, or enhance it.</p>';
     if (sel) {
       const isEq = P.equip[sel.slot] && P.equip[sel.slot].id === sel.id;
-      const st = C.itemStats(sel);
-      const baseKeys = Object.keys(sel.base), affKeys = Object.keys(sel.aff);
       const cost = C.enhCost(sel);
       const rate = sel.enh < C.ENH_MAX ? Math.round(C.ENH_RATE[sel.enh] * 100) : 0;
       const canE = sel.enh < C.ENH_MAX && P.gold >= cost.gold && P.shards >= cost.shards;
       detail = `<div class="detail"><h3>${itemCard(sel)}</h3>
         ${sel.wtype ? `<p class="muted">${sel.wtype}: ${C.WEAPONS[sel.wtype].kind === 'magic' ? 'magic basic attacks' : 'physical basic attacks'}, ${Math.round(C.WEAPONS[sel.wtype].spd * 100)}% attack speed</p>` : ''}
-        <ul class="props">${baseKeys.map(k => `<li>${statLine(k, st[k] - (sel.aff[k] || 0))}${sel.enh && ['atk', 'matk', 'hp', 'def', 'mres', 'eva'].includes(k) ? ' <small class="muted">(enhanced)</small>' : ''}</li>`).join('')}
-        ${affKeys.map(k => `<li class="aff">${statLine(k, sel.aff[k])}</li>`).join('')}</ul>
+        ${propsHtml(sel)}
         ${compareHtml(sel)}
         <div class="enh"><div><b>Enhance to +${sel.enh + 1}</b>${sel.enh >= C.ENH_MAX ? '<p class="muted">Max enhancement.</p>' : `
           <p>${rate}% success · ${F(cost.gold)} gold · ${cost.shards} shards</p>
@@ -301,7 +320,9 @@ import Core from './core.js';
     const k = a;
     if (k !== 'salvall' && k !== 'respec' && k !== 'skreset' && k !== 'wipe' && k !== 'adv') confirmKey = null;
     switch (k) {
-      case 'speed': speed = +d.n; document.querySelectorAll('[data-act=speed]').forEach(b => b.classList.toggle('on', +b.dataset.n === speed)); return;
+      case 'loot-close': lootQueue.shift(); renderLoot(); return;
+      case 'loot-eq': lootQueue.shift(); C.equip(P, id); log('loot', `Equipped ${C.findItem(P, id).name}.`); renderLoot(); break;
+      case 'loot-salv': { lootQueue.shift(); const v = C.salvage(P, id); if (v) log('salv', `Salvaged for ${v} shards.`); renderLoot(); break; }
       case 'fight': fight(); return;
       case 'skip': skip(); return;
       case 'fdown': case 'fup': case 'ftop': {
@@ -343,7 +364,7 @@ import Core from './core.js';
         break;
       }
       case 'wipe': confirmKey = 'wipe'; break;
-      case 'wipe2': P = C.newPlayer(); logLines = []; fighting = false; confirmKey = null; selId = null; log('floor', 'A new climber enters floor 1.'); nextEnemy(); save(); break;
+      case 'wipe2': P = C.newPlayer(); logLines = []; lootQueue = []; renderLoot(); fighting = false; confirmKey = null; selId = null; log('floor', 'A new climber enters floor 1.'); nextEnemy(); save(); break;
     }
     // Between fights, show the new numbers at full health. Mid-fight changes apply at the current HP ratio.
     const hpR = fighting ? B.hp / B.st.hp : 1, mpR = fighting ? B.mp / B.st.mp : 1;

@@ -21,7 +21,6 @@
       <div class="arena" style="margin-top:10px"><div class="fighter" id="you"></div><div class="fighter" id="foe"></div></div>
       <div class="controls">
         <div class="grp"><span class="muted">Floor</span><button id="fdown" data-act="fdown" aria-label="Go down a floor">◀</button><button id="fup" data-act="fup" aria-label="Go up a floor">▶</button><button id="ftop" data-act="ftop">Highest</button></div>
-        <div class="grp"><span class="muted">Speed</span><button data-act="speed" data-n="1" class="on">1×</button><button data-act="speed" data-n="2">2×</button><button data-act="speed" data-n="4">4×</button></div>
       </div>
       <div class="floorline"><span id="floor-prog"></span><span id="floor-max" class="muted"></span></div>
       <ul id="log" aria-live="off"></ul>
@@ -41,6 +40,7 @@
       <div id="panel"></div>
     </section>
   </main>
+  <aside id="lootpop" class="lootpop" role="dialog" aria-label="Item found" hidden></aside>
 </div>
 <script type="module" src="/src/main.js"></script>
 </body>
