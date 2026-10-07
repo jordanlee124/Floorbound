@@ -32,10 +32,16 @@ Run `npm run android:sync` after every web change so the app picks it up. To mak
 
 ## Code layout
 
-- `src/core.js`: all game rules (stats, classes, skills, items, enemies, combat). No DOM, so the sim can run it in Node.
-- `src/ui.js`: rendering and input.
-- `src/style.css`: styles. Fonts are bundled so the app works offline.
-- `tools/sim.mjs`: balance sim. Run it after changing any numbers in `core.js`.
+The game model (`src/game/`) has no DOM code, so the browser, the Android app and the Node balance sim all run the same classes.
+
+- `src/game/Game.js`: one play session. Owns the player and the current fight, and hands out rewards and floor progress.
+- `src/game/Player.js`: level, class, attributes, skills, gear and bag. `combatStats()` turns all of that into fight numbers.
+- `src/game/Battle.js`: one fight, simulated in 0.1s ticks. `SkillContext` is what a skill can do when it fires.
+- `src/game/Item.js`, `Enemy.js`, `Skill.js` (`ActiveSkill`, `PassiveSkill`), `CharacterClass.js`: the game objects.
+- `src/game/data/`: tuning tables for classes, skills, items and enemies. `curves.js` holds the growth curves.
+- `src/ui/App.js`: the fight loop, input routing, saving and rendering.
+- `src/ui/`: one class per view (`BattleView`, `LootPopup`, `HeaderView`) plus `panels/` (one class per tab). Each view exposes named `actions`, and buttons trigger them with `data-act="name"`.
+- `tools/sim.mjs`: balance sim. Run it after changing numbers. `npm run sim -- 2 --seed=1` is deterministic, so you can compare runs before and after a refactor.
 - `android/`: the Capacitor Android project.
 
 Saves are kept in the browser's or app's local storage. The Save tab has a copyable save code for moving a character between devices.

@@ -177,3 +177,5 @@ label { font-size: 13px; color: var(--dim); }
 @keyframes lp-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (max-width: 900px) { .lootpop { left: 16px; right: 16px; width: auto; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); max-height: 55vh; } }
 @media (prefers-reduced-motion: reduce) { .lootpop { animation: none; } }
+.settings { display: flex; gap: 8px 18px; flex-wrap: wrap; align-items: center; margin-block: 2px 10px; }
+.settings span { display: flex; gap: 8px; align-items: center; }
