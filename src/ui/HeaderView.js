@@ -1,4 +1,4 @@
-// Level, exp bar, gold and shards at the top of the screen.
+// Level, exp bar, gold, shards and cubes at the top of the screen.
 import { Component } from './Component.js';
 import { $ } from './dom.js';
 import { fmt } from '../game/index.js';
@@ -11,5 +11,7 @@ export class HeaderView extends Component {
     $('#hdr-exp-t').textContent = `${fmt(p.exp)} / ${fmt(need)} exp`;
     $('#hdr-gold').textContent = fmt(p.gold);
     $('#hdr-shards').textContent = fmt(p.shards);
+    $('#hdr-red').textContent = fmt(p.cubes.red);
+    $('#hdr-black').textContent = fmt(p.cubes.black);
   }
 }

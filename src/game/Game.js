@@ -3,6 +3,7 @@ import { Player } from './Player.js';
 import { Battle } from './Battle.js';
 import { Item } from './Item.js';
 import { Zone } from './Enemy.js';
+import { CUBES } from './data/potentials.js';
 import { KILLS_PER_FLOOR, POINTS_PER_LEVEL, isBossFloor } from './curves.js';
 import { rand, randInt, fmt } from './util.js';
 
@@ -66,14 +67,16 @@ export class Game {
     const drops = [];
     for (let i = 0; i < e.dropCount; i++) if (rand() < e.dropChance) {
       const rar = Item.rollRarity(st.mf, e.rarityBoost);
-      const ilvl = Math.max(1, e.f - (rand() < 0.5 ? 0 : randInt(0, 2)));
-      drops.push(Item.generate(ilvl, e.boss ? Math.max(2, rar) : rar));
+      drops.push(Item.generate(Item.levelFor(e.f), e.boss ? Math.max(2, rar) : rar));
     }
     if (rand() < (e.boss ? 1 : 0.12)) {
       const sh = e.boss ? randInt(5, 10) : 1;
       p.shards += sh;
-      this.log('loot', `+${sh} enhancement shard${sh > 1 ? 's' : ''}.`);
+      this.log('loot', `+${sh} shard${sh > 1 ? 's' : ''}.`);
     }
+    // Bosses and elites drop cubes, as MapleStory bosses do.
+    const cube = e.boss ? (rand() < 0.3 ? 'black' : 'red') : e.elite && rand() < 0.25 ? 'red' : null;
+    if (cube) { p.cubes[cube]++; this.log('loot', `+1 ${CUBES[cube].name}.`, cube === 'black' ? 3 : 2); }
     for (const it of drops) this.#stash(it, battle);
 
     if (e.boss) {
@@ -101,7 +104,7 @@ export class Game {
       this.log('salv', `Bag full. Sold ${it.name} for ${fmt(it.sellValue)}.`);
     } else {
       p.inv.push(it); battle.loot.push(it);
-      this.log('loot', `Looted [${it.rarity.name}] ${it.name} +0 (iLvl ${it.ilvl}).`, it.rar);
+      this.log('loot', `Looted [${it.rarity.name}] ${it.name} (Lv ${it.ilvl}).`, it.rar);
     }
   }
 

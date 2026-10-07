@@ -22,6 +22,8 @@ const BUILDS = {
   allvit_paladin: { path: ['warrior', 'paladin'], ratio: { vit: 1 }, skills: ['power_strike', 'cleave', 'holy_strike', 'iron_skin', 'retribution', 'divine_shield'], kind: 'phys' },
 };
 
+const STAR_TARGET = 22; // bots stop here; 22 to 25 costs far more than it gives
+
 class Bot {
   constructor(build) { this.build = build; }
 
@@ -55,9 +57,25 @@ class Bot {
       if (this.score(p, eq) > this.score(p, p.equip) * 1.001) p.equipItem(it.id);
     }
     for (const it of p.inv.slice()) p.salvage(it.id);
-    for (let k = 0; k < 20; k++) {
-      const items = SLOTS.map(s => p.equip[s]).filter(Boolean).sort((x, y) => (x.enh - (x.slot === 'weapon' ? 2 : 0)) - (y.enh - (y.slot === 'weapon' ? 2 : 0)));
-      if (!items.length || !p.enhance(items[0].id).ok) break;
+    const equipped = () => SLOTS.map(s => p.equip[s]).filter(Boolean);
+    // Cubes: shards buy Red Cubes. Cube the lowest-tier item (weapon first); keep a Black Cube result only if it scores higher.
+    while (p.buyCube('red')) {}
+    for (const type of ['black', 'red']) {
+      for (let k = 0; k < 200 && p.cubes[type] > 0; k++) {
+        const it = equipped().sort((x, y) => (x.rar - (x.slot === 'weapon' ? 0.5 : 0)) - (y.rar - (y.slot === 'weapon' ? 0.5 : 0)))[0];
+        if (!it) break;
+        const before = this.score(p, p.equip);
+        p.useCube(it.id, type);
+        if (it.pending) { const keep = { ...p.equip, [it.slot]: Object.assign(Object.create(Object.getPrototypeOf(it)), it, { rar: it.pending.rar, pot: it.pending.pot, pending: undefined }) }; it.resolvePending(this.score(p, keep) > before || it.pending.rar > it.rar); }
+      }
+    }
+    // Star Force: repair, then push the lowest-star item (weapon first), keeping a gold reserve and safeguarding 12-16.
+    for (const it of equipped()) if (it.broken) p.repair(it.id);
+    for (let k = 0; k < 60; k++) {
+      const it = equipped().filter(x => x.canStar && x.stars < STAR_TARGET).sort((x, y) => (x.stars - (x.slot === 'weapon' ? 2 : 0)) - (y.stars - (y.slot === 'weapon' ? 2 : 0)))[0];
+      if (!it) break;
+      const guard = it.canSafeguard && p.gold >= it.starCost(true) * 3;
+      if (p.gold < it.starCost(guard) * 3 || !p.starForce(it.id, guard).ok) break;
     }
   }
 }
@@ -79,7 +97,7 @@ function run(name, hours) {
       if (t - lastManaged > 30) { bot.manage(p); lastManaged = t; }
       battle = game.newBattle();
     }
-    if (t >= nextCheckpoint) { checkpoints.push(`${nextCheckpoint / 3600}h L${p.lvl} F${p.maxFloor} d${p.stats.deaths}`); nextCheckpoint += 3600; }
+    if (t >= nextCheckpoint) { checkpoints.push(`${nextCheckpoint / 3600}h L${p.lvl} F${p.maxFloor} d${p.stats.deaths}`); if (process.env.SIMDBG) console.log('  ', checkpoints.at(-1), SLOTS.map(s => p.equip[s] ? `${s[0]}${p.equip[s].ilvl}★${p.equip[s].stars}r${p.equip[s].rar}${p.equip[s].broken ? 'X' : ''}` : '-').join(' '), 'gold', Math.round(p.gold), 'cubes', p.cubes.red, p.cubes.black); nextCheckpoint += 3600; }
   }
   const arch = Object.entries(byArch).map(([k, v]) => `${k}:${(v.t / v.n).toFixed(1)}s/${(100 * v.d / v.n).toFixed(1)}%`).join(' ');
   console.log(name.padEnd(15), checkpoints.slice(-1).join(''), arch);

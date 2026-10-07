@@ -24,7 +24,7 @@ export class StatsPanel extends Panel {
       ['Attack', fmt(st.atk)], ['Magic', fmt(st.matk)], ['HP', fmt(st.hp)], ['MP', `${fmt(st.mp)} (+${st.mpRegen.toFixed(1)}/s)`],
       ['Speed', `${Math.round(st.spd)} (${(st.spd / 100).toFixed(2)} actions/s)`], ['Crit', `${st.crit.toFixed(1)}% × ${Math.round(st.critdmg)}%`],
       ['Phys reduction', `${(st.physRed * 100).toFixed(1)}% (Defense ${fmt(st.def)})`], ['Magic reduction', `${(st.magRed * 100).toFixed(1)}% (Resist ${fmt(st.mres)})`],
-      ['Dodge', `${(st.dodge * 100).toFixed(1)}%`], ['Accuracy', fmt(st.acc)], ['Lifesteal', `${st.ls.toFixed(1)}%`], ['Armor pen', `${st.pen.toFixed(1)}%`],
+      ['Dodge', `${(st.dodge * 100).toFixed(1)}%`], ['Accuracy', fmt(st.acc)], ['Damage', `+${st.dmg.toFixed(0)}% (+${st.boss.toFixed(0)}% vs bosses)`], ['Lifesteal', `${st.ls.toFixed(1)}%`], ['Armor pen', `${st.pen.toFixed(1)}%`],
       ['Item rarity', `+${st.mf.toFixed(0)}%`], ['Gold find', `+${st.gf.toFixed(0)}%`], ['Basic attack', st.basic === 'magic' ? 'Magic bolt' : 'Physical'],
     ].map(([k, v]) => `<li><span>${k}</span><b>${v}</b></li>`).join('');
     const cost = p.respecCost;
