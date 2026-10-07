@@ -13,7 +13,7 @@ import { ClassPanel } from './panels/ClassPanel.js';
 import { SavePanel } from './panels/SavePanel.js';
 
 const TICK_MS = 50;      // real ms between loop runs
-const TICKS_PER_LOOP = 3; // Battle ticks (0.1s of game time each) per loop run, so fights play at 6x
+const TICKS_PER_LOOP = 1; // Battle ticks (0.1s of game time each) per loop run, so fights play at 2x
 const SAVE_EVERY_MS = 10000;
 
 export class App {
