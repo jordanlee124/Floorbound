@@ -66,7 +66,7 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); g
 .who b.elite { color: var(--r3); }
 .who small { color: var(--dim); }
 .bar { position: relative; height: 20px; background: var(--panel2); border-radius: 4px; overflow: hidden; }
-.bar i { position: absolute; inset: 0 auto 0 0; transition: width .12s linear; }
+.bar i { position: absolute; inset: 0 auto 0 0; transition: width .06s linear; }
 .bar span { position: relative; display: block; text-align: center; font: 600 12px/20px var(--mono); }
 .bar.hp i { background: #3f7d49; } .bar.mp i { background: #2f5f9b; } .bar.ehp i { background: #8f3530; }
 .gauge { height: 3px; background: var(--panel2); border-radius: 2px; overflow: hidden; }

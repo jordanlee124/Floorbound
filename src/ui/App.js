@@ -12,7 +12,7 @@ import { SkillsPanel } from './panels/SkillsPanel.js';
 import { ClassPanel } from './panels/ClassPanel.js';
 import { SavePanel } from './panels/SavePanel.js';
 
-const TICK_MS = 100;
+const TICK_MS = 50; // real ms per game tick; each tick is Battle TICK (0.1s) of game time, so fights play at 2x
 const AFTER_FIGHT_PAUSE = 0.6; // seconds the result stays on screen before the next enemy appears
 const SAVE_EVERY_MS = 10000;
 
