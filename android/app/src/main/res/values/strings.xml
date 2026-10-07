@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Floorbound</string>
+    <string name="title_activity_main">Floorbound</string>
+    <string name="package_name">com.jordanlee124.floorbound</string>
+    <string name="custom_url_scheme">com.jordanlee124.floorbound</string>
+</resources>

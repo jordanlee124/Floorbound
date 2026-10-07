@@ -1,0 +1,8 @@
+{
+  "appId": "com.jordanlee124.floorbound",
+  "appName": "Floorbound",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#13161b"
+  }
+}
