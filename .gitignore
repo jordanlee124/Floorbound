@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+# Android build output (the android/ project itself is committed)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+*.apk
+*.aab
+*.keystore
