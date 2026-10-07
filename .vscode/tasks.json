@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev server",
+      "type": "npm",
+      "script": "dev",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": { "regexp": "^$" },
+        "background": { "beginsPattern": "VITE", "endsPattern": "Local:" }
+      }
+    },
+    { "label": "balance sim (4h)", "type": "npm", "script": "sim", "args": ["4"], "problemMatcher": [] }
+  ]
+}
