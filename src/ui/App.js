@@ -12,13 +12,12 @@ import { SkillsPanel } from './panels/SkillsPanel.js';
 import { ClassPanel } from './panels/ClassPanel.js';
 import { SavePanel } from './panels/SavePanel.js';
 
-const TICK_MS = 100;
-const AFTER_FIGHT_PAUSE = 0.6; // seconds the result stays on screen before the next enemy appears
+const TICK_MS = 50;      // real ms between loop runs
+const TICKS_PER_LOOP = 1; // Battle ticks (0.1s of game time each) per loop run, so fights play at 2x
 const SAVE_EVERY_MS = 10000;
 
 export class App {
   fighting = false;
-  cooldown = 0;
   confirmKey = null; // which confirm button is armed
   tab = GearPanel.id;
   #dirty = true;     // panels need a re-render
@@ -37,7 +36,7 @@ export class App {
   }
 
   get player() { return this.game.player; }
-  get busy() { return this.fighting || this.cooldown > 0; }
+  get busy() { return this.fighting; }
   get currentPanel() { return this.panels.find(p => p.constructor.id === this.tab); }
 
   start() {
@@ -80,19 +79,14 @@ export class App {
     this.game.finishBattle(battle);
     if (result === 'win') this.loot.offer(battle.loot);
     else this.log.add('floor', 'Adjust your build, or drop a floor and grind.');
-    this.fighting = false;
-    this.cooldown = AFTER_FIGHT_PAUSE;
+    this.fighting = false; // the finished fight stays on screen until the next Fight press
     this.#dirty = true;
     this.save();
     this.battleView.renderControls();
   }
 
   #loop() {
-    if (this.cooldown > 0) {
-      this.cooldown -= TICK_MS / 1000;
-      if (this.cooldown <= 0) { this.cooldown = 0; this.game.newBattle(); this.battleView.renderControls(); }
-    }
-    if (this.fighting) this.#step();
+    for (let i = 0; i < TICKS_PER_LOOP && this.fighting; i++) this.#step();
     this.renderBattle();
     if (this.#dirty) this.renderPanels();
   }
@@ -101,7 +95,7 @@ export class App {
   loadPlayer(player) {
     player.autoClimb = false;
     this.game = new Game(player, this.log.add);
-    this.fighting = false; this.cooldown = 0;
+    this.fighting = false;
     this.panels.forEach(p => { if ('selectedId' in p) p.selectedId = null; });
     this.loot.clear();
     this.game.newBattle();
