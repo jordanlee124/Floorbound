@@ -5,6 +5,7 @@ import { Skill } from './Skill.js';
 import { expToLevel, POINTS_PER_LEVEL } from './curves.js';
 import { clamp } from './util.js';
 import { SLOTS, WEAPONS } from './data/items.js';
+import { CUBES } from './data/potentials.js';
 import './data/skills.js';
 
 export const ATTRS = ['str', 'dex', 'int', 'vit', 'luk'];
@@ -21,6 +22,7 @@ export const ROTATION_SIZE = 3;
 // Every stat sum gear and passives can add to. Passive skills write into a copy of this.
 const EMPTY_MODS = { atk: 0, matk: 0, hp: 0, def: 0, mres: 0, atkp: 0, matkp: 0, hpp: 0, mpp: 0, crit: 0, critdmg: 0, spd: 0,
   ls: 0, pen: 0, eva: 0, acc: 0, accp: 0, mp: 0, mf: 0, gf: 0, defp: 0, str: 0, dex: 0, int: 0, vit: 0, luk: 0,
+  dmg: 0, boss: 0, allstat: 0,
   hpRegen: 0, frenzy: 0, reflect: 0, dodgeFlat: 0, execute: 0, ignite: 0, spellCrit: 0, manaShield: 0, vuln: 0, weaken: 0 };
 
 export class Player {
@@ -37,6 +39,7 @@ export class Player {
     const p = Object.assign(new Player(), data);
     p.alloc = { ...new Player().alloc, ...(data.alloc || {}) };
     p.stats = { ...new Player().stats, ...(data.stats || {}) };
+    p.cubes = { ...new Player().cubes, ...(data.cubes || {}) };
     p.inv = (data.inv || []).map(Item.fromJSON);
     p.equip = {};
     for (const s of SLOTS) if (data.equip && data.equip[s]) p.equip[s] = Item.fromJSON(data.equip[s]);
@@ -60,6 +63,7 @@ export class Player {
     this.inv = [];
     this.gold = 0;
     this.shards = 0;
+    this.cubes = { red: 0, black: 0 };
     this.floor = 1;
     this.maxFloor = 1;
     this.floorKills = 0;
@@ -190,14 +194,37 @@ export class Player {
   }
   toggleLock(id) { const it = this.findItem(id); if (it) it.lock = !it.lock; }
 
-  // Pay for and roll one enhancement. Returns { ok, outcome?, item?, reason? }.
-  enhance(id) {
+  // Pay for and roll one Star Force attempt. Returns { ok, outcome?, item?, reason? }.
+  starForce(id, safeguard = false) {
     const it = this.findItem(id);
-    if (!it || !it.canEnhance) return { ok: false, reason: 'Already at max.' };
-    const c = it.enhanceCost;
-    if (this.gold < c.gold || this.shards < c.shards) return { ok: false, reason: 'Not enough gold or shards.' };
-    this.gold -= c.gold; this.shards -= c.shards;
-    return { ok: true, outcome: it.rollEnhance(), item: it };
+    if (!it || !it.canStar) return { ok: false, reason: it && it.broken ? 'Repair it first.' : 'Already at max stars.' };
+    const gold = it.starCost(safeguard);
+    if (this.gold < gold) return { ok: false, reason: 'Not enough gold.' };
+    this.gold -= gold;
+    return { ok: true, outcome: it.rollStar(safeguard), item: it };
+  }
+
+  repair(id) {
+    const it = this.findItem(id);
+    if (!it || !it.broken || this.gold < it.repairCost) return false;
+    this.gold -= it.repairCost; it.repair();
+    return true;
+  }
+
+  // Trade shards for cubes.
+  buyCube(type, n = 1) {
+    const c = CUBES[type];
+    if (!c || n < 1 || this.shards < c.shards * n) return false;
+    this.shards -= c.shards * n; this.cubes[type] += n;
+    return true;
+  }
+
+  // Use one cube. Returns { ok, tierUp?, item? }.
+  useCube(id, type) {
+    const it = this.findItem(id);
+    if (!it || !CUBES[type] || !it.canCube || this.cubes[type] < 1) return { ok: false };
+    this.cubes[type]--;
+    return { ok: true, item: it, ...it.rollCube(type) };
   }
 
   // ---- Combat stats ----
@@ -212,7 +239,7 @@ export class Player {
       if (r && !sk.isActive) sk.apply(g, r);
     }
     const a = this.attributes;
-    for (const k of ATTRS) a[k] += g[k];
+    for (const k of ATTRS) a[k] = (a[k] + g[k]) * (1 + g.allstat / 100);
     const c = this.characterClass;
     const w = eq.weapon ? WEAPONS[eq.weapon.wtype] : null;
     const st = { attrs: a };
@@ -233,6 +260,7 @@ export class Player {
     st.acc = (a.dex * 2 + g.acc + this.lvl * 2) * (1 + g.accp / 100);
     const eva = a.dex * 1 + g.eva;
     st.dodge = clamp(eva / (eva + 150 + 10 * floor), 0, 0.35) + g.dodgeFlat;
+    st.dmg = g.dmg; st.boss = g.boss;
     st.ls = g.ls; st.pen = Math.min(80, g.pen);
     st.mf = a.luk * 0.6 + g.mf; st.gf = a.luk * 0.6 + g.gf;
     st.hpRegen = g.hpRegen; st.frenzy = g.frenzy; st.reflect = g.reflect; st.execute = g.execute;

@@ -4,7 +4,7 @@
 :root {
   --bg: #13161b; --panel: #1b1f26; --panel2: #222832; --line: #2e3540; --ink: #ddd6c6; --dim: #8d939c;
   --ember: #df8c3e; --blood: #c9473d; --mana: #4d8fdb; --vital: #5fae6d; --gold: #e3b54f;
-  --r0: #b9b6ae; --r1: #6cc070; --r2: #56a0ea; --r3: #b673e6; --r4: #f0a43a;
+  --r0: #b9b6ae; --r1: #56a0ea; --r2: #b673e6; --r3: #e9b43c; --r4: #6fd36a; /* potential tiers, MapleStory colours */
   --display: 'Grenze Gotisch', Georgia, serif;
   --body: 'Alegreya Sans', 'Segoe UI', system-ui, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
@@ -49,7 +49,7 @@ header { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-i
 .hdr-exp .track { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; }
 .hdr-exp .track i { display: block; height: 100%; background: var(--gold); transition: width .2s; }
 .hdr-exp .meta { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
-.purse { display: flex; gap: 14px; font-family: var(--mono); font-size: 14px; }
+.purse { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--mono); font-size: 14px; }
 .purse span { display: flex; gap: 6px; align-items: center; }
 .coin { width: 10px; height: 10px; border-radius: 50%; background: var(--gold); display: inline-block; }
 .shard { width: 9px; height: 9px; background: var(--mana); transform: rotate(45deg); display: inline-block; }
@@ -115,7 +115,17 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); g
 .detail h3 { display: grid; }
 .detail h3 small { color: var(--dim); font-weight: 400; }
 .props { list-style: none; padding: 0; margin: 0; font-family: var(--mono); font-size: 13px; }
-.props .aff { color: var(--r2); }
+.props .pot-head { font: 600 11px/1.6 var(--body); text-transform: uppercase; letter-spacing: .12em; color: var(--dim); margin-top: 4px; }
+.props .broken { color: var(--blood); }
+.stars { font-size: 14px; letter-spacing: 1px; color: var(--gold); word-break: break-all; }
+.stars i { font-style: normal; color: var(--line); }
+.stars b { margin-left: 6px; }
+.enh .odds { font-family: var(--mono); font-size: 13px; }
+.enh .chance { color: var(--vital); font-weight: 700; }
+.pending { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+.pending > div { padding: 8px; border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 6px; align-content: start; }
+.cube { width: 9px; height: 9px; display: inline-block; border-radius: 2px; }
+.cube.red { background: var(--blood); } .cube.black { background: #0b0d10; border: 1px solid var(--dim); }
 .cmp { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 14px; font-size: 13px; }
 .cmp li, .kv li, .derived li { display: flex; justify-content: space-between; gap: 10px; }
 .cmp b { font-family: var(--mono); font-weight: 600; }

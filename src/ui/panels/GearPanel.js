@@ -1,15 +1,16 @@
-// Equipped gear, the selected item's details and enhancement, and the bag.
+// Equipped gear, the selected item's details, Star Force and cubes, and the bag.
 import { Panel } from './Panel.js';
 import { ItemView } from '../ItemView.js';
 import { SLOTS, SLOT_NAME, RARITIES, BAG_SIZE, fmt } from '../../game/index.js';
 
-const AUTO_SALVAGE = ['Off', 'Common', 'Uncommon and below', 'Rare and below'];
+const AUTO_SALVAGE = ['Off', 'Normal', 'Rare and below', 'Epic and below'];
 // Index = minimum rarity shown; RARITIES.length = never.
-const POPUP_OPTIONS = ['Every drop', 'Uncommon and better', 'Rare and better', 'Epic and better', 'Legendary only', 'Never'];
+const POPUP_OPTIONS = ['Every drop', 'Rare and better', 'Epic and better', 'Unique and better', 'Legendary only', 'Never'];
 
 export class GearPanel extends Panel {
   static id = 'gear';
   selectedId = null;
+  safeguard = false;
 
   get actions() {
     const p = this.player, log = this.game.log;
@@ -20,18 +21,29 @@ export class GearPanel extends Panel {
       salvage: ({ id }) => { const v = p.salvage(id); if (v) { log('salv', `Salvaged for ${v} shards.`); this.selectedId = null; } },
       sell: ({ id }) => { const v = p.sell(id); if (v) { log('salv', `Sold for ${fmt(v)} gold.`); this.selectedId = null; } },
       lock: ({ id }) => p.toggleLock(id),
-      enhance: ({ id }) => this.#enhance(id),
+      star: ({ id }) => this.#star(id),
+      safeguard: () => { this.safeguard = !this.safeguard; },
+      repair: ({ id }) => { const it = p.findItem(id); if (p.repair(id)) log('level', `Repaired ${it.name} at ★${it.stars}.`); },
+      'buy-cube': ({ type }) => p.buyCube(type),
+      cube: ({ id, type }) => this.#cube(id, type),
+      'cube-keep': ({ id, keep }) => p.findItem(id)?.resolvePending(keep === '1'),
       'salvage-all': () => { const r = p.salvageAll(); log('salv', `Salvaged ${r.count} items for ${r.shards} shards.`); this.selectedId = null; },
     };
   }
 
-  #enhance(id) {
-    const r = this.player.enhance(id);
+  #star(id) {
+    const r = this.player.starForce(id, this.safeguard);
     if (!r.ok) return;
-    const it = r.item;
-    if (r.outcome === 'up') this.game.log('level', `Success! ${it.name} is now +${it.enh}.`);
-    else if (r.outcome === 'down') this.game.log('death', `Failed. ${it.name} dropped to +${it.enh}.`);
-    else this.game.log('death', `Failed. ${it.name} stays at +${it.enh}.`);
+    const it = r.item, log = this.game.log;
+    if (r.outcome === 'up') log('level', `Star Force success! ${it.name} is now ★${it.stars}.`);
+    else if (r.outcome === 'down') log('death', `Failed. ${it.name} dropped to ★${it.stars}.${it.chanceTime ? ' Chance Time: the next star is certain.' : ''}`);
+    else if (r.outcome === 'destroy') log('death', `${it.name} was destroyed! Repair it to use it again.`);
+    else log('death', `Failed. ${it.name} stays at ★${it.stars}.`);
+  }
+
+  #cube(id, type) {
+    const r = this.player.useCube(id, type);
+    if (r.ok && r.tierUp) this.game.log('level', `Tier up! ${r.item.name} rolled ${r.item.pending ? 'a' : 'is now'} ${RARITIES[(r.item.pending || r.item).rar].name} potential.`, (r.item.pending || r.item).rar);
   }
 
   render() {
@@ -45,11 +57,11 @@ export class GearPanel extends Panel {
     const bag = p.inv.slice().sort((a, b) => b.rar - a.rar || b.ilvl - a.ilvl).map(it => {
       const cur = p.equip[it.slot];
       return `<button class="inv ${it === sel ? 'sel' : ''}" data-act="select" data-id="${it.id}">${it.lock ? '<i class="lock" title="Locked">L</i>' : ''}
-        ${ItemView.title(it, true)}<small>${SLOT_NAME[it.slot]} · iLvl ${it.ilvl}${cur && it.ilvl > cur.ilvl + 2 ? ' · <b class="up">newer</b>' : ''}</small></button>`;
+        ${ItemView.title(it, true)}<small>${SLOT_NAME[it.slot]} · Lv ${it.ilvl}${cur && it.ilvl > cur.ilvl ? ' · <b class="up">newer</b>' : ''}</small></button>`;
     }).join('');
     const options = (labels, value) => labels.map((n, i) => `<option value="${i}" ${value === i ? 'selected' : ''}>${n}</option>`).join('');
     return `<div class="gear"><section><h2>Equipped</h2><div class="slots">${slots}</div></section>
-      <section class="det">${sel ? this.#detail(sel) : '<p class="muted">Select an item to see its stats, compare it, or enhance it.</p>'}</section>
+      <section class="det">${sel ? this.#detail(sel) : '<p class="muted">Select an item to see its stats, compare it, star it or cube it.</p>'}</section>
       <section><div class="inv-head"><h2>Bag <small>${p.inv.length} / ${BAG_SIZE}</small></h2>
         <div class="row">${this.confirmButton('salvage-all', { label: 'Salvage all unlocked', confirmLabel: 'Confirm salvage', action: 'salvage-all' })}</div></div>
         <div class="settings">
@@ -70,7 +82,8 @@ export class GearPanel extends Panel {
       ${ItemView.weaponNote(it)}
       ${ItemView.properties(it)}
       ${ItemView.comparison(p, it)}
-      ${ItemView.enhancePanel(p, it)}
+      ${ItemView.starForcePanel(p, it, this.safeguard)}
+      ${ItemView.cubePanel(p, it)}
       <div class="row">${actions}<button data-act="lock" data-id="${it.id}">${it.lock ? 'Unlock' : 'Lock'}</button></div></div>`;
   }
 }

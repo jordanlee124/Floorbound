@@ -1,9 +1,17 @@
-// A piece of equipment. Plain fields (id, slot, ilvl, rar, enh, base, aff, lock, wtype, name) are the save format.
+// A piece of equipment. Plain fields are the save format:
+// id, slot, ilvl, rar (potential tier), stars, base, pot ([{ k, t }] lines), lock, wtype, name,
+// broken (destroyed by Star Force, waiting for repair), boomStreak (failures in a row that lost a star),
+// pity ({ red, black }: cubes used at the current tier), pending (a Black Cube result waiting for a choice).
 import { gearPower } from './curves.js';
 import { rand, pick } from './util.js';
-import { SLOTS, RARITIES, WEAPONS, ITEM_NAMES, MATERIALS, AFFIXES, ENHANCE_MAX, ENHANCE_RATES, ENHANCE_DROP_FROM, ENHANCED_STATS } from './data/items.js';
+import { SLOTS, RARITIES, WEAPONS, ITEM_NAMES, MATERIALS, STAR_STATS, BRACKET, BRACKET_POWER_OFFSET } from './data/items.js';
+import { POTENTIALS, POTENTIAL_LINES, CUBES } from './data/potentials.js';
+import {
+  STAR_SUCCESS, STAR_DESTROY, STAR_SAFE_FLOORS, STAR_DROP_FROM, CHANCE_TIME_AFTER, SAFEGUARD_FROM, SAFEGUARD_TO,
+  SAFEGUARD_COST_MUL, DESTROYED_STARS, REPAIR_COST_MUL, MAX_STARS, starMultiplier, starCostFactor,
+} from './data/starforce.js';
 
-const AFFIX_KEYS = Object.keys(AFFIXES);
+export const LEGENDARY = RARITIES.length - 1;
 
 export class Item {
   static #nextId = Date.now() % 100000;
@@ -11,9 +19,21 @@ export class Item {
   // Keep new ids clear of ids already in a loaded save.
   static reserveIds(items) { for (const it of items) if (it && it.id >= Item.#nextId) Item.#nextId = it.id; }
 
-  static fromJSON(data) { return data instanceof Item ? data : Object.assign(new Item(), data); }
+  // Loads current saves and saves from before Star Force (enh + aff), which get fresh potential lines.
+  static fromJSON(data) {
+    if (data instanceof Item) return data;
+    const it = Object.assign(new Item(), data);
+    if (it.stars === undefined) it.stars = Math.min(it.enh || 0, it.maxStars);
+    if (!it.pot) it.pot = Item.rollLines(it.slot, it.rar, CUBES.red);
+    if (!it.pity) it.pity = { red: 0, black: 0 };
+    delete it.enh; delete it.aff;
+    return it;
+  }
 
-  // Weighted rarity roll. mf is % item rarity; boost multiplies every non-common weight (elites, bosses).
+  // Gear drops in level brackets: floors 1-9 give level 1 gear, floors 10-19 level 10, and so on.
+  static levelFor(floor) { return Math.max(1, Math.floor(floor / BRACKET) * BRACKET); }
+
+  // Weighted rarity roll. mf is % item rarity; boost multiplies every non-normal weight (elites, bosses).
   static rollRarity(mf, boost) {
     const m = 1 + mf / 100;
     const weights = RARITIES.map((r, i) => r.weight * (i === 0 ? 1 : Math.pow(m, i)) * (i ? boost : 1));
@@ -22,13 +42,27 @@ export class Item {
     return 0;
   }
 
+  // Potential lines for a tier. The first line has the full tier; later lines only with the cube's prime chance.
+  static rollLines(slot, tier, cube) {
+    if (!tier) return [];
+    const lines = [];
+    for (let i = 0; i < POTENTIAL_LINES; i++) {
+      const t = i === 0 || rand() < cube.prime[i] ? tier : tier - 1;
+      const pool = Object.keys(POTENTIALS).filter(k => POTENTIALS[k].slots.includes(slot) && t >= (POTENTIALS[k].minTier || 0));
+      lines.push({ k: pick(pool), t });
+    }
+    return lines;
+  }
+
   static generate(ilvl, rarityIdx, slot, weaponType) {
     slot = slot || pick(SLOTS);
-    const r = RARITIES[rarityIdx];
-    const it = Object.assign(new Item(), { id: ++Item.#nextId, slot, ilvl, rar: rarityIdx, enh: 0, base: {}, aff: {}, lock: false });
-    const s = gearPower(ilvl) * r.mul;
-    const lin = (3 + 1.5 * ilvl) * r.mul;
-    const material = MATERIALS[Math.min(MATERIALS.length - 1, Math.floor((ilvl - 1) / 8))];
+    const it = Object.assign(new Item(), {
+      id: ++Item.#nextId, slot, ilvl, rar: rarityIdx, stars: 0, base: {}, pot: [], lock: false, pity: { red: 0, black: 0 },
+    });
+    const pl = it.powerLevel;
+    const s = gearPower(pl);
+    const lin = 3 + 1.5 * pl;
+    const material = MATERIALS[Math.min(MATERIALS.length - 1, Math.floor(ilvl / BRACKET))];
     const b = it.base;
     if (slot === 'weapon') {
       const type = weaponType || pick(Object.keys(WEAPONS)); const w = WEAPONS[type];
@@ -37,8 +71,8 @@ export class Item {
       if (w.matk) b.matk = 12 * s * w.matk;
       if (w.crit) b.crit = w.crit;
       if (w.critdmg) b.critdmg = w.critdmg;
-      if (w.mp) b.mp = w.mp + ilvl;
-      if (w.acc) b.acc = w.acc + ilvl;
+      if (w.mp) b.mp = w.mp + pl;
+      if (w.acc) b.acc = w.acc + pl;
       it.name = `${material} ${type}`;
     } else {
       if (slot === 'helm') { b.hp = 25 * s; b.mres = lin * 1.2; }
@@ -46,47 +80,108 @@ export class Item {
       if (slot === 'gloves') { b.atk = 3 * s; b.matk = 3 * s; b.def = lin * 0.4; }
       if (slot === 'boots') { b.spd = 4; b.def = lin * 0.6; b.eva = lin; }
       if (slot === 'ring') { if (rand() < 0.5) b.crit = 3; else b.critdmg = 12; b.hp = 10 * s; }
-      if (slot === 'amulet') { b.hp = 20 * s; b.mp = 10 + ilvl; b.mres = lin * 0.5; }
+      if (slot === 'amulet') { b.hp = 20 * s; b.mp = 10 + pl; b.mres = lin * 0.5; }
       it.name = `${material} ${pick(ITEM_NAMES[slot])}`;
     }
-    const keys = AFFIX_KEYS.slice();
-    for (let i = 0; i < r.affixes; i++) {
-      const k = keys.splice(Math.floor(rand() * keys.length), 1)[0];
-      it.aff[k] = AFFIXES[k].value(ilvl, rand());
-    }
+    it.pot = Item.rollLines(slot, rarityIdx, CUBES.red);
     return it;
   }
 
   get rarity() { return RARITIES[this.rar]; }
   get weapon() { return this.wtype ? WEAPONS[this.wtype] : null; }
-  get displayName() { return this.enh ? `${this.name} +${this.enh}` : this.name; }
+  get displayName() { return this.stars ? `${this.name} ★${this.stars}` : this.name; }
+  // The floor this item's stats are worth.
+  get powerLevel() { return this.ilvl + BRACKET_POWER_OFFSET; }
 
-  static enhanceMultiplier(n) { return 1 + 0.08 * n + 0.006 * n * n; }
+  // [{ k, t, value }] for display and stats.
+  get lines() { return Item.#lineValues(this.pot, this.powerLevel); }
+  get pendingLines() { return this.pending ? Item.#lineValues(this.pending.pot, this.powerLevel) : null; }
+  static #lineValues(pot, pl) { return pot.map(l => ({ ...l, value: POTENTIALS[l.k].value(l.t, pl) })); }
 
-  // Stats this item gives. Enhancement scales base stats only, never affixes.
+  // Stats this item gives. Stars scale base stats only, never potential. A destroyed item gives nothing.
   get stats() {
-    const out = {}; const m = Item.enhanceMultiplier(this.enh);
-    for (const k in this.base) out[k] = (out[k] || 0) + this.base[k] * (ENHANCED_STATS.includes(k) ? m : 1);
-    for (const k in this.aff) out[k] = (out[k] || 0) + this.aff[k];
+    const out = {};
+    if (this.broken) return out;
+    const m = starMultiplier(this.stars);
+    for (const k in this.base) out[k] = (out[k] || 0) + this.base[k] * (STAR_STATS.includes(k) ? m : 1);
+    for (const l of this.lines) out[l.k] = (out[l.k] || 0) + l.value;
     return out;
   }
 
-  get sellValue() { return Math.round(6 * gearPower(this.ilvl) * this.rarity.mul * (1 + this.rar)); }
-  get salvageValue() { return this.rarity.salvage + Math.floor(this.enh * this.enh / 3); }
+  get sellValue() { return Math.round(6 * gearPower(this.powerLevel) * (1 + this.rar) * (1 + this.stars / 5)); }
+  get salvageValue() { return this.rarity.salvage + Math.floor(this.stars * this.stars / 3); }
 
-  get canEnhance() { return this.enh < ENHANCE_MAX; }
-  get enhanceChance() { return this.canEnhance ? ENHANCE_RATES[this.enh] : 0; }
-  get enhanceCost() {
-    const n = this.enh;
-    return { gold: Math.round(25 * gearPower(this.ilvl) * Math.pow(n + 1, 1.35)), shards: n + 1 + Math.floor(n * n / 6) };
+  // ---- Star Force ----
+  static starMultiplier(s) { return starMultiplier(s); }
+  get maxStars() { return MAX_STARS.find(([lvl]) => this.ilvl >= lvl)[1]; }
+  get canStar() { return !this.broken && this.stars < this.maxStars; }
+  get chanceTime() { return this.boomStreak >= CHANCE_TIME_AFTER; }
+  get canSafeguard() { return this.stars >= SAFEGUARD_FROM && this.stars <= SAFEGUARD_TO && STAR_DESTROY[this.stars] > 0 && !this.chanceTime; }
+  // { success, destroy, drop } for the next attempt. drop: whether a failure loses a star.
+  starOdds(safeguard = false) {
+    const s = this.stars;
+    if (this.chanceTime) return { success: 1, destroy: 0, drop: false };
+    return {
+      success: STAR_SUCCESS[s],
+      destroy: safeguard && this.canSafeguard ? 0 : STAR_DESTROY[s],
+      drop: s >= STAR_DROP_FROM && !STAR_SAFE_FLOORS.includes(s),
+    };
   }
-  get enhanceRisky() { return this.enh >= ENHANCE_DROP_FROM; }
+  starCost(safeguard = false) {
+    const gold = Math.round(starCostFactor(this.stars) * gearPower(this.powerLevel));
+    return safeguard && this.canSafeguard ? gold * SAFEGUARD_COST_MUL : gold;
+  }
+  get repairCost() { return Math.round(REPAIR_COST_MUL * starCostFactor(DESTROYED_STARS) * gearPower(this.powerLevel)); }
 
-  // Roll one enhancement attempt (cost already paid). Returns 'up' | 'down' | 'same'.
-  rollEnhance() {
-    if (rand() < ENHANCE_RATES[this.enh]) { this.enh++; return 'up'; }
-    if (this.enhanceRisky) { this.enh--; return 'down'; }
-    return 'same';
+  // Roll one attempt (cost already paid). Returns 'up' | 'keep' | 'down' | 'destroy'.
+  rollStar(safeguard = false) {
+    const o = this.starOdds(safeguard);
+    const r = rand();
+    if (r < o.success) { this.stars++; this.boomStreak = 0; return 'up'; }
+    if (r < o.success + o.destroy) { this.broken = true; this.stars = DESTROYED_STARS; this.boomStreak = 0; return 'destroy'; }
+    if (o.drop) { this.stars--; this.boomStreak = (this.boomStreak || 0) + 1; return 'down'; }
+    this.boomStreak = 0;
+    return 'keep';
+  }
+
+  repair() { this.broken = false; }
+
+  // ---- Cubes ----
+  get canCube() { return !this.pending; }
+  cubePity(type) { return this.pity[type] || 0; }
+  // Chance this cube moves the item up a tier (1 once pity is reached).
+  tierUpChance(type) {
+    const c = CUBES[type];
+    if (this.rar >= LEGENDARY) return 0;
+    return this.cubePity(type) + 1 >= c.pity[this.rar] ? 1 : c.tierUp[this.rar];
+  }
+
+  // Roll a cube (already paid for). A Red Cube applies at once; a Black Cube stores the result in `pending`.
+  // Returns { tierUp }.
+  rollCube(type) {
+    const c = CUBES[type];
+    const up = rand() < this.tierUpChance(type);
+    const result = { rar: up ? this.rar + 1 : this.rar, pot: [], type };
+    result.pot = Item.rollLines(this.slot, result.rar, c);
+    if (c.choose) this.pending = result;
+    else this.#applyCube(result);
+    if (!up) this.pity[type] = this.cubePity(type) + 1;
+    return { tierUp: up };
+  }
+
+  // Keep or discard a Black Cube result. Discarding a tier-up loses it, as in MapleStory.
+  resolvePending(keepNew) {
+    const res = this.pending;
+    if (!res) return false;
+    delete this.pending;
+    if (keepNew) this.#applyCube(res);
+    else if (res.rar > this.rar) this.pity[res.type] = this.cubePity(res.type) + 1;
+    return true;
+  }
+
+  #applyCube({ rar, pot }) {
+    if (rar > this.rar) this.pity = { red: 0, black: 0 };
+    this.rar = rar; this.pot = pot;
   }
 
   toJSON() { return { ...this }; }

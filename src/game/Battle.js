@@ -75,7 +75,7 @@ export class Battle {
   }
   get damageMultiplier() {
     const st = this.stats, e = this.enemy;
-    let m = 1 + st.vuln;
+    let m = 1 + st.vuln + st.dmg / 100 + (e.boss ? st.boss / 100 : 0);
     if (st.frenzy) m += st.frenzy * Math.floor((1 - this.hp / st.hp) * 10);
     if (st.execute && e.hpFraction < 0.35) m += st.execute;
     return m;
