@@ -45,7 +45,7 @@ export class BattleView extends Component {
   #playerCard(p, b, st) {
     const chips = Object.values(b.buffs).map(x => `<em>${esc(x.name)} ${x.t.toFixed(0)}s</em>`);
     if (b.shield > 0) chips.push(`<em>Shield ${fmt(b.shield)}</em>`);
-    if (b.minion) chips.push(`<em>Skeleton ${b.minion.t.toFixed(0)}s</em>`);
+    if (b.minion) chips.push(`<em>${esc(b.minion.name)} ${b.minion.t.toFixed(0)}s</em>`);
     const cds = p.loadout.map(id => {
       const left = b.cooldowns[id] || 0;
       return `<span class="cd ${left > 0 ? 'wait' : ''}">${esc(Skill.get(id).name)}${left > 0 ? ' ' + left.toFixed(1) : ''}</span>`;

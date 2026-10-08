@@ -1,10 +1,19 @@
-// Class definitions. `growth` is the free attribute gain per level while in that class.
-export const CLASS_UNLOCK_LEVEL = { 1: 10, 2: 30 };
+// Class definitions, MapleStory-style: Novice, then a job advancement at levels 10, 30, 60 and 100.
+// `growth` is the free attribute gain per level while in that class (on top of AP).
+export const CLASS_UNLOCK_LEVEL = { 1: 10, 2: 30, 3: 60, 4: 100 };
+export const JOB_NAMES = ['Novice', '1st job', '2nd job', '3rd job', '4th job'];
+
+// SP per level, banked into the skill book of the job those levels belong to (Novice: levels 1-9, 1st job: 10-29, ...).
+// SP from a job's levels can only be spent on that job's skills, as in MapleStory.
+export const SP_PER_LEVEL = [1, 3, 3, 3, 3];
+// Skill max rank by job.
+export const MAX_RANK = [10, 20, 30, 30, 30];
 
 export const CLASS_DEFS = {
   novice: { name: 'Novice', tier: 0, growth: { str: 1, dex: 1, int: 1, vit: 1 }, hpMul: 1, mpMul: 1,
     skills: ['power_strike'], next: ['warrior', 'rogue', 'mage'],
     desc: 'Everyone starts here. Choose a class at level 10.' },
+
   warrior: { name: 'Warrior', tier: 1, parent: 'novice', growth: { str: 2, vit: 1 }, hpMul: 1.15, mpMul: 0.9,
     skills: ['cleave', 'war_cry', 'iron_skin', 'second_wind'], next: ['berserker', 'paladin'],
     desc: 'Physical melee. Sturdy, steady damage. Struggles against heavily armored foes.' },
@@ -14,22 +23,61 @@ export const CLASS_DEFS = {
   mage: { name: 'Mage', tier: 1, parent: 'novice', growth: { int: 2, vit: 1 }, hpMul: 0.9, mpMul: 1.3,
     skills: ['fireball', 'frost_nova', 'arcane_mind', 'mana_shield'], next: ['pyromancer', 'necromancer'],
     desc: 'Magic damage never misses and ignores armor, but spirits resist it and MP runs dry.' },
+
   berserker: { name: 'Berserker', tier: 2, parent: 'warrior', growth: { str: 3, vit: 1 }, hpMul: 1.15, mpMul: 0.9,
-    skills: ['rampage', 'blood_frenzy', 'bloodthirst'], next: [],
+    skills: ['rampage', 'blood_frenzy', 'bloodthirst'], next: ['reaver'],
     desc: 'Hits harder the closer to death. Heals by dealing damage.' },
   paladin: { name: 'Paladin', tier: 2, parent: 'warrior', growth: { str: 1, vit: 3 }, hpMul: 1.3, mpMul: 1,
-    skills: ['holy_strike', 'divine_shield', 'retribution'], next: [],
+    skills: ['holy_strike', 'divine_shield', 'retribution'], next: ['templar'],
     desc: 'Holy Strike deals magic damage scaled by HP. Slow killer, hard to kill.' },
   assassin: { name: 'Assassin', tier: 2, parent: 'rogue', growth: { dex: 3, luk: 1 }, hpMul: 0.95, mpMul: 1,
-    skills: ['assassinate', 'exploit', 'execute'], next: [],
+    skills: ['assassinate', 'exploit', 'execute'], next: ['nightblade'],
     desc: 'Burst and armor penetration. Shreds bosses, folds under sustained pressure.' },
   ranger: { name: 'Ranger', tier: 2, parent: 'rogue', growth: { dex: 2, luk: 2 }, hpMul: 1, mpMul: 1,
-    skills: ['volley', 'snare', 'quick_draw'], next: [],
+    skills: ['volley', 'snare', 'quick_draw'], next: ['sharpshooter'],
     desc: 'Attack speed and crowd control. Luck-heavy, so it finds more loot.' },
   pyromancer: { name: 'Pyromancer', tier: 2, parent: 'mage', growth: { int: 4 }, hpMul: 0.9, mpMul: 1.3,
-    skills: ['meteor', 'ignite', 'combustion'], next: [],
+    skills: ['meteor', 'ignite', 'combustion'], next: ['infernalist'],
     desc: 'Highest magic burst in the game. Thin HP and a hungry MP bar.' },
   necromancer: { name: 'Necromancer', tier: 2, parent: 'mage', growth: { int: 2, vit: 2 }, hpMul: 1.05, mpMul: 1.3,
-    skills: ['raise_skeleton', 'life_drain', 'curse'], next: [],
+    skills: ['raise_skeleton', 'life_drain', 'curse'], next: ['deathcaller'],
     desc: 'Minion damage, life drain and curses. Durable, slower to kill.' },
+
+  reaver: { name: 'Reaver', tier: 3, parent: 'berserker', growth: { str: 3, vit: 2 }, hpMul: 1.2, mpMul: 0.9,
+    skills: ['brutal_swing', 'enrage', 'savage_blows', 'blood_pact'], next: ['warlord'],
+    desc: 'Enrage for a burst of damage and swing twice as hard. Crits come easier.' },
+  templar: { name: 'Templar', tier: 3, parent: 'paladin', growth: { str: 2, vit: 3 }, hpMul: 1.4, mpMul: 1,
+    skills: ['blessed_hammer', 'sanctuary', 'aegis', 'zeal'], next: ['lightbringer'],
+    desc: 'More holy damage from HP, a heal that also empowers, and thicker armor.' },
+  nightblade: { name: 'Nightblade', tier: 3, parent: 'assassin', growth: { dex: 3, luk: 2 }, hpMul: 1, mpMul: 1,
+    skills: ['shadow_flurry', 'smoke_veil', 'vital_strike', 'venom'], next: ['shadowlord'],
+    desc: 'Flurries of hits and huge crit damage. Still fragile.' },
+  sharpshooter: { name: 'Sharpshooter', tier: 3, parent: 'ranger', growth: { dex: 3, luk: 2 }, hpMul: 1, mpMul: 1,
+    skills: ['piercing_arrow', 'focus', 'eagle_eye', 'hunters_mark'], next: ['stormbow'],
+    desc: 'Shots that never miss and a focus that speeds every action.' },
+  infernalist: { name: 'Infernalist', tier: 3, parent: 'pyromancer', growth: { int: 5 }, hpMul: 0.9, mpMul: 1.4,
+    skills: ['flame_pillar', 'inferno', 'fire_mastery', 'spell_amp'], next: ['archmage'],
+    desc: 'Fire on top of fire: pillars, lingering infernos and stronger burns.' },
+  deathcaller: { name: 'Deathcaller', tier: 3, parent: 'necromancer', growth: { int: 3, vit: 2 }, hpMul: 1.1, mpMul: 1.35,
+    skills: ['bone_spear', 'soul_siphon', 'dark_pact', 'plague'], next: ['lich'],
+    desc: 'Faster spells, more drain, and a plague that weakens everything.' },
+
+  warlord: { name: 'Warlord', tier: 4, parent: 'reaver', growth: { str: 4, vit: 2 }, hpMul: 1.25, mpMul: 0.9,
+    skills: ['raging_blow', 'unbreakable', 'berserk_mastery'], next: [],
+    desc: 'The final warrior. Four-hit blows and a body that will not fall.' },
+  lightbringer: { name: 'Lightbringer', tier: 4, parent: 'templar', growth: { str: 2, vit: 4 }, hpMul: 1.45, mpMul: 1,
+    skills: ['judgment', 'divine_aura', 'guardian'], next: [],
+    desc: 'Judgment scales with HP. The hardest class to kill in the game.' },
+  shadowlord: { name: 'Shadowlord', tier: 4, parent: 'nightblade', growth: { dex: 4, luk: 2 }, hpMul: 1, mpMul: 1,
+    skills: ['death_mark', 'phantom_step', 'killing_spree'], next: [],
+    desc: 'Death Mark always crits. Untouchable at its best, finishes anything wounded.' },
+  stormbow: { name: 'Stormbow', tier: 4, parent: 'sharpshooter', growth: { dex: 3, luk: 3 }, hpMul: 1.05, mpMul: 1,
+    skills: ['arrow_storm', 'wind_mastery', 'deadeye'], next: [],
+    desc: 'Arrow Storm fires eight shots. Fastest attacker, best loot luck.' },
+  archmage: { name: 'Archmage', tier: 4, parent: 'infernalist', growth: { int: 6 }, hpMul: 0.9, mpMul: 1.5,
+    skills: ['cataclysm', 'arcane_overload', 'elemental_mastery'], next: [],
+    desc: 'Cataclysm is the biggest single hit in the game. Paper-thin.' },
+  lich: { name: 'Lich', tier: 4, parent: 'deathcaller', growth: { int: 4, vit: 2 }, hpMul: 1.15, mpMul: 1.4,
+    skills: ['army_of_dead', 'phylactery', 'death_mastery'], next: [],
+    desc: 'A stronger undead army and a body that pays in MP before HP.' },
 };

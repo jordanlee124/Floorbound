@@ -11,15 +11,15 @@ const { Game, Player, Skill, SLOTS, TICK } = await import('../src/game/index.js'
 const [hoursArg, buildsArg] = args.filter(a => !a.startsWith('--'));
 
 const BUILDS = {
-  berserker: { path: ['warrior', 'berserker'], ratio: { str: 3, vit: 1, dex: 1 }, skills: ['power_strike', 'cleave', 'bloodthirst', 'rampage', 'blood_frenzy', 'war_cry', 'iron_skin', 'second_wind'], kind: 'phys' },
-  paladin: { path: ['warrior', 'paladin'], ratio: { str: 2, vit: 2 }, skills: ['power_strike', 'cleave', 'holy_strike', 'iron_skin', 'retribution', 'divine_shield', 'second_wind', 'war_cry'], kind: 'phys' },
-  assassin: { path: ['rogue', 'assassin'], ratio: { dex: 3, luk: 1, str: 1 }, skills: ['power_strike', 'twin_strike', 'assassinate', 'exploit', 'lethality', 'poison_blade', 'execute', 'evasion'], kind: 'phys' },
-  ranger: { path: ['rogue', 'ranger'], ratio: { dex: 2, luk: 1, str: 1, vit: 1 }, skills: ['power_strike', 'twin_strike', 'volley', 'quick_draw', 'lethality', 'poison_blade', 'snare', 'evasion'], kind: 'phys' },
-  pyro: { path: ['mage', 'pyromancer'], ratio: { int: 3, vit: 1 }, skills: ['power_strike', 'fireball', 'meteor', 'ignite', 'arcane_mind', 'combustion', 'frost_nova', 'mana_shield'], kind: 'magic' },
-  necro: { path: ['mage', 'necromancer'], ratio: { int: 2, vit: 2 }, skills: ['power_strike', 'fireball', 'life_drain', 'raise_skeleton', 'curse', 'arcane_mind', 'mana_shield', 'frost_nova'], kind: 'magic' },
+  berserker: { path: ['warrior', 'berserker', 'reaver', 'warlord'], ratio: { str: 3, vit: 1, dex: 1 }, skills: ['power_strike', 'cleave', 'bloodthirst', 'rampage', 'blood_frenzy', 'war_cry', 'iron_skin', 'second_wind', 'brutal_swing', 'enrage', 'blood_pact', 'savage_blows', 'raging_blow', 'berserk_mastery', 'unbreakable'], kind: 'phys' },
+  paladin: { path: ['warrior', 'paladin', 'templar', 'lightbringer'], ratio: { str: 2, vit: 2 }, skills: ['power_strike', 'cleave', 'holy_strike', 'iron_skin', 'retribution', 'divine_shield', 'second_wind', 'war_cry', 'blessed_hammer', 'zeal', 'sanctuary', 'aegis', 'judgment', 'divine_aura', 'guardian'], kind: 'phys' },
+  assassin: { path: ['rogue', 'assassin', 'nightblade', 'shadowlord'], ratio: { dex: 3, luk: 1, str: 1 }, skills: ['power_strike', 'twin_strike', 'assassinate', 'exploit', 'lethality', 'poison_blade', 'execute', 'evasion', 'shadow_flurry', 'vital_strike', 'venom', 'smoke_veil', 'death_mark', 'killing_spree', 'phantom_step'], kind: 'phys' },
+  ranger: { path: ['rogue', 'ranger', 'sharpshooter', 'stormbow'], ratio: { dex: 2, luk: 1, str: 1, vit: 1 }, skills: ['power_strike', 'twin_strike', 'volley', 'quick_draw', 'lethality', 'poison_blade', 'snare', 'evasion', 'piercing_arrow', 'focus', 'eagle_eye', 'hunters_mark', 'arrow_storm', 'wind_mastery', 'deadeye'], kind: 'phys' },
+  pyro: { path: ['mage', 'pyromancer', 'infernalist', 'archmage'], ratio: { int: 3, vit: 1 }, skills: ['power_strike', 'fireball', 'meteor', 'ignite', 'arcane_mind', 'combustion', 'frost_nova', 'mana_shield', 'flame_pillar', 'fire_mastery', 'inferno', 'spell_amp', 'cataclysm', 'elemental_mastery', 'arcane_overload'], kind: 'magic' },
+  necro: { path: ['mage', 'necromancer', 'deathcaller', 'lich'], ratio: { int: 2, vit: 2 }, skills: ['power_strike', 'fireball', 'life_drain', 'raise_skeleton', 'curse', 'arcane_mind', 'mana_shield', 'frost_nova', 'bone_spear', 'dark_pact', 'soul_siphon', 'plague', 'army_of_dead', 'death_mastery', 'phylactery'], kind: 'magic' },
   // Deliberately one-dimensional builds, to check that dumping one stat is not the best plan.
-  allstr_warrior: { path: ['warrior', 'berserker'], ratio: { str: 1 }, skills: ['power_strike', 'cleave', 'rampage', 'bloodthirst', 'blood_frenzy', 'war_cry'], kind: 'phys' },
-  allvit_paladin: { path: ['warrior', 'paladin'], ratio: { vit: 1 }, skills: ['power_strike', 'cleave', 'holy_strike', 'iron_skin', 'retribution', 'divine_shield'], kind: 'phys' },
+  allstr_warrior: { path: ['warrior', 'berserker', 'reaver', 'warlord'], ratio: { str: 1 }, skills: ['power_strike', 'cleave', 'rampage', 'bloodthirst', 'blood_frenzy', 'war_cry', 'brutal_swing', 'enrage', 'blood_pact', 'raging_blow', 'berserk_mastery'], kind: 'phys' },
+  allvit_paladin: { path: ['warrior', 'paladin', 'templar', 'lightbringer'], ratio: { vit: 1 }, skills: ['power_strike', 'cleave', 'holy_strike', 'iron_skin', 'retribution', 'divine_shield', 'blessed_hammer', 'zeal', 'aegis', 'judgment', 'guardian'], kind: 'phys' },
 };
 
 const STAR_TARGET = 22; // bots stop here; 22 to 25 costs far more than it gives
@@ -45,13 +45,16 @@ class Bot {
       for (const k in B.ratio) { const d = B.ratio[k] / total - p.alloc[k] / spent; if (d > bd) { bd = d; best = k; } }
       p.allocate(best, 1);
     }
-    for (let guard = 0; p.skillPts > 0 && guard < 50; guard++) {
-      const id = B.skills.find(id => p.knownSkillIds.includes(id) && p.skillRank(id) < Skill.get(id).maxRank);
-      if (!id || !p.learnSkill(id)) break;
+    for (let guard = 0; guard < 500; guard++) {
+      const id = B.skills.find(id => p.canLearn(id));
+      if (!id) break;
+      p.learnSkill(id);
     }
-    const actives = B.skills.filter(id => Skill.get(id).isActive && p.skillRank(id));
+    // Rotation: newest job's actives first, Power Strike only as filler.
+    const tier = id => p.skillClass(id).tier;
+    const actives = B.skills.filter(id => Skill.get(id).isActive && p.skillRank(id)).sort((a, b) => tier(b) - tier(a));
     const classActives = actives.filter(x => x !== 'power_strike');
-    p.loadout = (classActives.length >= 2 ? classActives : actives).slice(0, 3);
+    p.loadout = (classActives.length >= 2 ? classActives : actives).slice(0, p.rotationSize);
     for (const it of p.inv.slice()) {
       const eq = { ...p.equip, [it.slot]: it };
       if (this.score(p, eq) > this.score(p, p.equip) * 1.001) p.equipItem(it.id);
@@ -99,6 +102,7 @@ function run(name, hours) {
     }
     if (t >= nextCheckpoint) { checkpoints.push(`${nextCheckpoint / 3600}h L${p.lvl} F${p.maxFloor} d${p.stats.deaths}`); if (process.env.SIMDBG) console.log('  ', checkpoints.at(-1), SLOTS.map(s => p.equip[s] ? `${s[0]}${p.equip[s].ilvl}★${p.equip[s].stars}r${p.equip[s].rar}${p.equip[s].broken ? 'X' : ''}` : '-').join(' '), 'gold', Math.round(p.gold), 'cubes', p.cubes.red, p.cubes.black); nextCheckpoint += 3600; }
   }
+  if (checkpoints.length < hours) checkpoints.push(`${hours}h L${p.lvl} F${p.maxFloor} d${p.stats.deaths}`); // float drift can skip the last one
   const arch = Object.entries(byArch).map(([k, v]) => `${k}:${(v.t / v.n).toFixed(1)}s/${(100 * v.d / v.n).toFixed(1)}%`).join(' ');
   console.log(name.padEnd(15), checkpoints.slice(-1).join(''), arch);
 }
