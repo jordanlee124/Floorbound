@@ -32,6 +32,7 @@ export class Player {
   static create() {
     const p = new Player();
     p.equip.weapon = Item.generate(1, 0, 'weapon', 'Sword');
+    delete p.equip.weapon.job; // the starter sword is common, so every job can keep it
     p.equip.armor = Item.generate(1, 0, 'armor');
     p.skills.power_strike = 1;
     return p;
@@ -229,12 +230,16 @@ export class Player {
   }
 
   // ---- Gear & bag ----
+  // Job branch for class gear: the 1st job in the lineage (warrior, rogue or mage), or null for a Novice.
+  get job() { const c = this.characterClass.lineage[1]; return c ? c.id : null; }
+  // Class gear needs the matching job; a Novice can wear any gear below item level 10.
+  canEquip(it) { return !it.job || it.job === this.job || (!this.job && it.ilvl < 10); }
   get bagFull() { return this.inv.length >= BAG_SIZE; }
   findItem(id) { return this.inv.find(x => x.id === id) || SLOTS.map(s => this.equip[s]).find(x => x && x.id === id); }
   isEquipped(item) { return this.equip[item.slot] === item; }
 
   equipItem(id) {
-    const i = this.inv.findIndex(x => x.id === id); if (i < 0) return null;
+    const i = this.inv.findIndex(x => x.id === id); if (i < 0 || !this.canEquip(this.inv[i])) return null;
     const it = this.inv[i]; this.inv.splice(i, 1);
     if (this.equip[it.slot]) this.inv.push(this.equip[it.slot]);
     this.equip[it.slot] = it;

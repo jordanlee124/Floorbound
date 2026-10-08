@@ -75,11 +75,12 @@ class Bot {
     const classActives = actives.filter(x => x !== 'power_strike');
     p.loadout = (classActives.length >= 2 ? classActives : actives).slice(0, p.rotationSize);
     for (const it of p.inv.slice()) {
+      if (!p.canEquip(it)) continue;
       const eq = { ...p.equip, [it.slot]: it };
       if (this.score(p, eq) > this.score(p, p.equip) * 1.001) p.equipItem(it.id);
     }
     // Sets: try the best piece of one set in every slot it covers, and keep the swap if the whole outfit scores higher.
-    const pool = [...p.inv, ...SLOTS.map(sl => p.equip[sl])].filter(it => it && it.set);
+    const pool = [...p.inv, ...SLOTS.map(sl => p.equip[sl])].filter(it => it && it.set && p.canEquip(it));
     for (const setId of new Set(pool.map(it => it.set))) {
       const eq = { ...p.equip };
       for (const it of pool.filter(x => x.set === setId)) {
@@ -90,7 +91,7 @@ class Bot {
     }
     // Keep the best bag piece per set and slot for later; salvage everything else.
     const keep = {};
-    for (const it of p.inv) if (it.set) { const k = it.set + it.slot, c = keep[k]; if (!c || it.ilvl * 10 + it.rar > c.ilvl * 10 + c.rar) keep[k] = it; }
+    for (const it of p.inv) if (it.set && p.canEquip(it)) { const k = it.set + it.slot, c = keep[k]; if (!c || it.ilvl * 10 + it.rar > c.ilvl * 10 + c.rar) keep[k] = it; }
     const kept = new Set(Object.values(keep));
     for (const it of p.inv.slice()) if (!kept.has(it)) p.salvage(it.id);
     const equipped = () => SLOTS.map(s => p.equip[s]).filter(Boolean);

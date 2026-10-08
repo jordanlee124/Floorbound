@@ -17,14 +17,27 @@ export const RARITIES = [
 export const BRACKET = 10;
 export const BRACKET_POWER_OFFSET = 7;
 
+// Every weapon belongs to one job, as in MapleStory.
 export const WEAPONS = {
-  Sword: { atk: 1.0, spd: 1.0, kind: 'phys' },
-  Axe: { atk: 1.35, spd: 0.82, kind: 'phys', critdmg: 20 },
-  Dagger: { atk: 0.72, spd: 1.25, kind: 'phys', crit: 6 },
-  Bow: { atk: 0.9, spd: 1.1, kind: 'phys', acc: 10 },
-  Staff: { matk: 1.15, spd: 0.9, kind: 'magic', mp: 20 },
-  Wand: { matk: 0.85, spd: 1.15, kind: 'magic', crit: 3 },
+  Sword: { atk: 1.0, spd: 1.0, kind: 'phys', job: 'warrior' },
+  Axe: { atk: 1.35, spd: 0.82, kind: 'phys', critdmg: 20, job: 'warrior' },
+  Dagger: { atk: 0.72, spd: 1.25, kind: 'phys', crit: 6, job: 'rogue' },
+  Bow: { atk: 0.9, spd: 1.1, kind: 'phys', acc: 10, job: 'rogue' },
+  Staff: { matk: 1.15, spd: 0.9, kind: 'magic', mp: 20, job: 'mage' },
+  Wand: { matk: 0.85, spd: 1.15, kind: 'magic', crit: 3, job: 'mage' },
 };
+
+// Class gear, MapleStory-style: an item with a job can only be worn by that job's branch (the 1st job you chose).
+// Class armor adds flat main and secondary stats on top of its base stats. Rings and amulets are always common.
+// Novices can wear class gear only below item level 10.
+export const JOBS = {
+  warrior: { name: 'Warrior', main: 'str', sub: 'vit', names: { helm: 'Helm', armor: 'Plate', gloves: 'Gauntlets', boots: 'Greaves' } },
+  rogue: { name: 'Rogue', main: 'dex', sub: 'luk', names: { helm: 'Hood', armor: 'Leathers', gloves: 'Wraps', boots: 'Treads' } },
+  mage: { name: 'Mage', main: 'int', sub: 'vit', names: { helm: 'Circlet', armor: 'Robe', gloves: 'Gloves', boots: 'Sandals' } },
+};
+export const JOB_ARMOR_SLOTS = ['helm', 'armor', 'gloves', 'boots'];
+export const CLASS_ARMOR_CHANCE = 0.7; // share of armor drops that are class armor (weapons always are)
+export const OWN_JOB_CHANCE = 0.6;     // share of class drops that are for your own job; the rest are any job
 
 export const ITEM_NAMES = {
   helm: ['Cap', 'Helm', 'Hood', 'Circlet'], armor: ['Vest', 'Mail', 'Robe', 'Plate'],

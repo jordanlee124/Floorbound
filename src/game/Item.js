@@ -2,10 +2,10 @@
 // id, slot, ilvl, rar (potential tier), stars, base, pot ([{ k, t }] lines), lock, wtype, name,
 // broken (destroyed by Star Force, waiting for repair), boomStreak (failures in a row that lost a star),
 // pity ({ red, black }: cubes used at the current tier), pending (a Black Cube result waiting for a choice),
-// set (an item set id, for set pieces).
+// set (an item set id, for set pieces), job (warrior/rogue/mage for class gear, absent for common gear).
 import { gearPower } from './curves.js';
 import { rand, pick } from './util.js';
-import { SLOTS, RARITIES, WEAPONS, ITEM_NAMES, MATERIALS, STAR_STATS, BRACKET, BRACKET_POWER_OFFSET } from './data/items.js';
+import { SLOTS, RARITIES, WEAPONS, ITEM_NAMES, MATERIALS, STAR_STATS, BRACKET, BRACKET_POWER_OFFSET, JOBS, JOB_ARMOR_SLOTS, CLASS_ARMOR_CHANCE, OWN_JOB_CHANCE } from './data/items.js';
 import { POTENTIALS, POTENTIAL_LINES, CUBES } from './data/potentials.js';
 import { SETS, DROP_SETS } from './data/sets.js';
 import {
@@ -56,7 +56,17 @@ export class Item {
     return lines;
   }
 
-  static generate(ilvl, rarityIdx, slot, weaponType) {
+  // A random drop. Weapons and most armor are class gear, usually for playerJob (the dropper's job branch, or null).
+  static generateDrop(ilvl, rarityIdx, playerJob) {
+    const slot = pick(SLOTS);
+    if (slot !== 'weapon' && !(JOB_ARMOR_SLOTS.includes(slot) && rand() < CLASS_ARMOR_CHANCE)) return Item.generate(ilvl, rarityIdx, slot);
+    const job = playerJob && rand() < OWN_JOB_CHANCE ? playerJob : pick(Object.keys(JOBS));
+    const wtype = slot === 'weapon' ? pick(Object.keys(WEAPONS).filter(w => WEAPONS[w].job === job)) : undefined;
+    return Item.generate(ilvl, rarityIdx, slot, wtype, job);
+  }
+
+  // job: makes helm/armor/gloves/boots class armor. A weapon's job always comes from its type.
+  static generate(ilvl, rarityIdx, slot, weaponType, job) {
     slot = slot || pick(SLOTS);
     const it = Object.assign(new Item(), {
       id: ++Item.#nextId, slot, ilvl, rar: rarityIdx, stars: 0, base: {}, pot: [], lock: false, pity: { red: 0, black: 0 },
@@ -76,6 +86,7 @@ export class Item {
       if (w.mp) b.mp = w.mp + pl;
       if (w.acc) b.acc = w.acc + pl;
       it.name = `${material} ${type}`;
+      it.job = w.job;
     } else {
       if (slot === 'helm') { b.hp = 25 * s; b.mres = lin * 1.2; }
       if (slot === 'armor') { b.hp = 45 * s; b.def = lin * 1.6; b.mres = lin * 0.4; }
@@ -84,6 +95,13 @@ export class Item {
       if (slot === 'ring') { if (rand() < 0.5) b.crit = 3; else b.critdmg = 12; b.hp = 10 * s; }
       if (slot === 'amulet') { b.hp = 20 * s; b.mp = 10 + pl; b.mres = lin * 0.5; }
       it.name = `${material} ${pick(ITEM_NAMES[slot])}`;
+      if (job && JOB_ARMOR_SLOTS.includes(slot)) {
+        const J = JOBS[job];
+        it.job = job;
+        b[J.main] = Math.round(2 + 0.2 * pl);
+        b[J.sub] = Math.round(1 + 0.1 * pl);
+        it.name = `${material} ${J.names[slot]}`;
+      }
     }
     it.pot = Item.rollLines(slot, rarityIdx, CUBES.red);
     return it;
@@ -93,7 +111,7 @@ export class Item {
   // and the set name replaces the material.
   static generateSetPiece(ilvl, rarityIdx, setId = pick(DROP_SETS)) {
     const set = SETS[setId], slot = pick(set.slots);
-    const it = Item.generate(ilvl, rarityIdx, slot, slot === 'weapon' ? pick(set.weapons) : undefined);
+    const it = Item.generate(ilvl, rarityIdx, slot, slot === 'weapon' ? pick(set.weapons) : undefined, set.job);
     it.set = setId;
     it.name = `${set.name} ${it.name.split(' ').slice(1).join(' ')}`;
     return it;
@@ -102,6 +120,7 @@ export class Item {
   get rarity() { return RARITIES[this.rar]; }
   get setDef() { return this.set ? SETS[this.set] : null; }
   get weapon() { return this.wtype ? WEAPONS[this.wtype] : null; }
+  get jobDef() { return this.job ? JOBS[this.job] : null; }
   get displayName() { return this.stars ? `${this.name} ★${this.stars}` : this.name; }
   // The floor this item's stats are worth.
   get powerLevel() { return this.ilvl + BRACKET_POWER_OFFSET; }

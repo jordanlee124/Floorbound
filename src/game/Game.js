@@ -86,7 +86,7 @@ export class Game {
     this.#gainExp(exp);
     const st = battle.stats, ilvl = Item.levelFor(e.f), rar = () => Math.max(D.minRar, Item.rollRarity(st.mf, 3));
     const drops = [];
-    for (let i = 0; i < D.items; i++) drops.push(Item.generate(ilvl, rar()));
+    for (let i = 0; i < D.items; i++) drops.push(Item.generateDrop(ilvl, rar(), p.job));
     if (rand() < D.setChance) drops.push(Item.generateSetPiece(ilvl, rar(), def.set));
     for (const it of drops) this.#stash(it, battle);
   }
@@ -127,7 +127,7 @@ export class Game {
       const rar = Item.rollRarity(st.mf, e.rarityBoost);
       const r = e.boss ? Math.max(2, rar) : rar;
       const isSet = rand() < SET_CHANCE[e.boss ? 'boss' : e.elite ? 'elite' : 'normal'];
-      drops.push(isSet ? Item.generateSetPiece(Item.levelFor(e.f), r) : Item.generate(Item.levelFor(e.f), r));
+      drops.push(isSet ? Item.generateSetPiece(Item.levelFor(e.f), r) : Item.generateDrop(Item.levelFor(e.f), r, p.job));
     }
     if (rand() < (e.boss ? 1 : 0.12)) {
       const sh = e.boss ? randInt(5, 10) : 1;

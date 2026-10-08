@@ -2,7 +2,7 @@
 import { POTENTIALS, RARITIES, SLOT_NAME, STAR_STATS, CUBES, LEGENDARY, SAFEGUARD_COST_MUL, Item, fmt } from '../game/index.js';
 import { esc, rarityClass } from './dom.js';
 
-const STAT_LABEL = { atk: 'Attack', matk: 'Magic', hp: 'HP', def: 'Defense', mres: 'Magic Resist', crit: '% Crit', critdmg: '% Crit Damage', spd: '% Speed', mp: 'MP', acc: 'Accuracy', eva: 'Evasion' };
+const STAT_LABEL = { str: 'STR', dex: 'DEX', int: 'INT', vit: 'VIT', luk: 'LUK', atk: 'Attack', matk: 'Magic', hp: 'HP', def: 'Defense', mres: 'Magic Resist', crit: '% Crit', critdmg: '% Crit Damage', spd: '% Speed', mp: 'MP', acc: 'Accuracy', eva: 'Evasion' };
 const PERCENT_BASE = ['crit', 'critdmg', 'spd'];
 const pct = x => `${Math.round(x * 1000) / 10}%`;
 const SET_LABEL = { atkp: '% Attack', matkp: '% Magic', hpp: '% HP', mpp: '% MP', defp: '% Defense', ls: '% Lifesteal', crit: '% Crit',
@@ -27,7 +27,7 @@ export class ItemView {
 
   // Name in potential-tier colour; the long form adds tier, slot and item level.
   static title(it, short = false) {
-    const meta = short ? '' : `<small>${RARITIES[it.rar].name} ${SLOT_NAME[it.slot]} · Lv ${it.ilvl}</small>`;
+    const meta = short ? '' : `<small>${RARITIES[it.rar].name} ${SLOT_NAME[it.slot]} · Lv ${it.ilvl} · ${it.jobDef ? it.jobDef.name : 'Any class'}</small>`;
     return `<span class="iname ${rarityClass(it.rar)}">${esc(it.displayName)}</span>${meta}`;
   }
 
@@ -72,6 +72,7 @@ export class ItemView {
   // How the player's combat stats would change if they equipped this item.
   static comparison(player, it) {
     if (player.isEquipped(it)) return '<p class="muted">Equipped.</p>';
+    if (!player.canEquip(it)) return `<p class="warn">${it.jobDef.name} gear: your class can't equip it. Salvage or sell it.</p>`;
     const cur = player.combatStats();
     const next = player.combatStats(player.floor, { ...player.equip, [it.slot]: it });
     const rows = COMPARE_ROWS.map(([label, read, points]) => {

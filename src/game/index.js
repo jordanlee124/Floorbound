@@ -7,7 +7,7 @@ export { Enemy, Zone } from './Enemy.js';
 export { Skill, ActiveSkill, PassiveSkill, BoostSkill } from './Skill.js';
 export { CharacterClass } from './CharacterClass.js';
 export { CLASS_UNLOCK_LEVEL, JOB_NAMES, SP_PER_LEVEL } from './data/classes.js';
-export { SLOTS, SLOT_NAME, RARITIES, WEAPONS, STAR_STATS } from './data/items.js';
+export { SLOTS, SLOT_NAME, RARITIES, WEAPONS, STAR_STATS, JOBS } from './data/items.js';
 export { POTENTIALS, CUBES } from './data/potentials.js';
 export { SETS } from './data/sets.js';
 export { BOSSES, BOSS_BY_ID, DIFFICULTIES } from './data/bosses.js';

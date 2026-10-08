@@ -40,7 +40,7 @@ export class LootPopup extends Component {
       ${ItemView.properties(it)}
       ${ItemView.setInfo(p, it)}
       ${ItemView.comparison(p, it)}
-      <div class="row"><button class="pri" data-act="loot-equip" data-id="${it.id}">Equip</button>
+      <div class="row"><button class="pri" data-act="loot-equip" data-id="${it.id}" ${p.canEquip(it) ? '' : 'disabled'}>Equip</button>
         <button data-act="loot-keep">Keep in bag</button>
         <button data-act="loot-salvage" data-id="${it.id}">Salvage (+${it.salvageValue})</button></div>`;
     box.hidden = false;
