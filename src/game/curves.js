@@ -4,7 +4,10 @@
 export const gearPower = f => Math.pow(1.085, f - 1) * (1 + 0.03 * (f - 1));
 
 // Enemies outgrow gear a little each floor. Enhancement, rarity, levels and smart builds cover the gap.
-export const enemyPower = f => Math.pow(1.105, f - 1) * (1 + 0.03 * (f - 1));
+// Past LATE_FLOOR enemies grow a further LATE_GROWTH per floor, so gear and Star Force can't run away with the late game.
+export const LATE_FLOOR = 150;
+export const LATE_GROWTH = 1.02;
+export const enemyPower = f => Math.pow(1.105, f - 1) * (1 + 0.03 * (f - 1)) * Math.pow(LATE_GROWTH, Math.max(0, f - LATE_FLOOR));
 
 // MapleStory-shaped: the Novice levels fly by, then each level costs a little more than the floors pay out,
 // so the curve steepens over time and the late jobs are a real grind.
