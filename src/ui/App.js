@@ -10,6 +10,7 @@ import { GearPanel } from './panels/GearPanel.js';
 import { StatsPanel } from './panels/StatsPanel.js';
 import { SkillsPanel } from './panels/SkillsPanel.js';
 import { ClassPanel } from './panels/ClassPanel.js';
+import { BossPanel } from './panels/BossPanel.js';
 import { SavePanel } from './panels/SavePanel.js';
 
 const TICK_MS = 50;      // real ms between loop runs
@@ -31,7 +32,7 @@ export class App {
     this.header = new HeaderView(this);
     this.battleView = new BattleView(this);
     this.loot = new LootPopup(this);
-    this.panels = [GearPanel, StatsPanel, SkillsPanel, ClassPanel, SavePanel].map(P => new P(this));
+    this.panels = [GearPanel, StatsPanel, SkillsPanel, ClassPanel, BossPanel, SavePanel].map(P => new P(this));
     this.components = [this.battleView, this.loot, ...this.panels];
   }
 
@@ -65,6 +66,12 @@ export class App {
   skip() {
     for (let guard = 0; this.fighting && guard < 5000; guard++) this.#step();
     return false;
+  }
+
+  // Enter a boss raid and start fighting. The next Fight after it ends goes back to the floor.
+  startBoss(id, diff) {
+    if (this.busy || !this.game.newBossBattle(id, diff)) return false;
+    this.fight();
   }
 
   moveTo(floor) {

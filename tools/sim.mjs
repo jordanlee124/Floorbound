@@ -7,7 +7,7 @@ if (seedArg) {
   let seed = Number(seedArg.slice(7)) | 0;
   Math.random = () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-const { Game, Player, Skill, SLOTS, TICK } = await import('../src/game/index.js');
+const { Game, Player, Skill, SLOTS, TICK, BOSSES } = await import('../src/game/index.js');
 const [hoursArg, buildsArg] = args.filter(a => !a.startsWith('--'));
 
 const BUILDS = {
@@ -23,9 +23,28 @@ const BUILDS = {
 };
 
 const STAR_TARGET = 22; // bots stop here; 22 to 25 costs far more than it gives
+// Boss resets run on the calendar. The sim assumes 3 hours of play a day at 2x fight speed,
+// so one second of game time is 0.5 s played and 4 s of calendar time.
+const CALENDAR_PER_GAME_SECOND = 0.5 * 24 / 3;
+const START = Date.UTC(2026, 0, 1);
 
 class Bot {
-  constructor(build) { this.build = build; }
+  constructor(build) { this.build = build; this.failed = {}; }
+
+  // The hardest boss difficulty that is open, uncleared, not already failed this reset and
+  // at or below the bot's best floor; otherwise the next floor enemy.
+  nextBattle(game) {
+    const p = game.player;
+    const modes = BOSSES.flatMap(b => Object.entries(b.modes).map(([diff, m]) => ({ id: b.id, diff, m }))).sort((a, b) => b.m.floor - a.m.floor);
+    for (const { id, diff, m } of modes) {
+      const key = `${id}:${diff}`, s = game.bossStatus(id, diff);
+      if (!s.unlocked || s.cleared || m.floor > p.maxFloor || this.failed[key] === s.resetsAt) continue;
+      const battle = game.newBossBattle(id, diff);
+      battle.onLose = () => { this.failed[key] = s.resetsAt; };
+      return battle;
+    }
+    return game.newBattle();
+  }
 
   score(p, equip) {
     const st = p.combatStats(p.floor, equip), kind = this.build.kind;
@@ -59,7 +78,21 @@ class Bot {
       const eq = { ...p.equip, [it.slot]: it };
       if (this.score(p, eq) > this.score(p, p.equip) * 1.001) p.equipItem(it.id);
     }
-    for (const it of p.inv.slice()) p.salvage(it.id);
+    // Sets: try the best piece of one set in every slot it covers, and keep the swap if the whole outfit scores higher.
+    const pool = [...p.inv, ...SLOTS.map(sl => p.equip[sl])].filter(it => it && it.set);
+    for (const setId of new Set(pool.map(it => it.set))) {
+      const eq = { ...p.equip };
+      for (const it of pool.filter(x => x.set === setId)) {
+        const cur = eq[it.slot];
+        if (!cur || cur.set !== setId || this.score(p, { ...eq, [it.slot]: it }) > this.score(p, eq)) eq[it.slot] = it;
+      }
+      if (this.score(p, eq) > this.score(p, p.equip) * 1.001) for (const sl of SLOTS) if (eq[sl] && eq[sl] !== p.equip[sl]) p.equipItem(eq[sl].id);
+    }
+    // Keep the best bag piece per set and slot for later; salvage everything else.
+    const keep = {};
+    for (const it of p.inv) if (it.set) { const k = it.set + it.slot, c = keep[k]; if (!c || it.ilvl * 10 + it.rar > c.ilvl * 10 + c.rar) keep[k] = it; }
+    const kept = new Set(Object.values(keep));
+    for (const it of p.inv.slice()) if (!kept.has(it)) p.salvage(it.id);
     const equipped = () => SLOTS.map(s => p.equip[s]).filter(Boolean);
     // Cubes: shards buy Red Cubes. Cube the lowest-tier item (weapon first); keep a Black Cube result only if it scores higher.
     while (p.buyCube('red')) {}
@@ -87,22 +120,26 @@ function run(name, hours) {
   const bot = new Bot(BUILDS[name]);
   const p = Player.create(); p.autoClimb = true;
   const game = new Game(p);
+  let t = 0;
+  game.now = () => START + t * 1000 * CALENDAR_PER_GAME_SECOND;
   const byArch = {}, checkpoints = [];
-  let t = 0, rest = 0, lastManaged = 0, nextCheckpoint = 3600, battle = game.newBattle();
+  let rest = 0, lastManaged = 0, nextCheckpoint = 3600, battle = bot.nextBattle(game);
   while (t < hours * 3600) {
     if (rest > 0) { rest -= TICK; t += TICK; continue; }
     const r = battle.tick(); t += TICK;
     if (r) {
       const e = battle.enemy;
+      if (r === 'lose' && battle.onLose) battle.onLose();
+      if (process.env.RAIDDBG && e.raid) console.log('  raid', e.raid.id, e.raid.diff, r, 'L' + p.lvl, 'F' + p.maxFloor, battle.time.toFixed(0) + 's', 'hpleft', (e.hpFraction * 100).toFixed(0) + '%');
       if (!e.boss) { const A = (byArch[e.arch] ||= { t: 0, n: 0, d: 0 }); A.t += battle.time; A.n++; if (r === 'lose') A.d++; }
       game.finishBattle(battle);
       rest = (r === 'lose' ? 3 : rest) + 0.5; // pause between fights; longer after a death
       if (t - lastManaged > 30) { bot.manage(p); lastManaged = t; }
-      battle = game.newBattle();
+      battle = bot.nextBattle(game);
     }
-    if (t >= nextCheckpoint) { checkpoints.push(`${nextCheckpoint / 3600}h L${p.lvl} F${p.maxFloor} d${p.stats.deaths}`); if (process.env.SIMDBG) console.log('  ', checkpoints.at(-1), SLOTS.map(s => p.equip[s] ? `${s[0]}${p.equip[s].ilvl}★${p.equip[s].stars}r${p.equip[s].rar}${p.equip[s].broken ? 'X' : ''}` : '-').join(' '), 'gold', Math.round(p.gold), 'cubes', p.cubes.red, p.cubes.black); nextCheckpoint += 3600; }
+    if (t >= nextCheckpoint) { checkpoints.push(`${nextCheckpoint / 3600}h L${p.lvl} F${p.maxFloor} d${p.stats.deaths} raids${p.stats.raids || 0}`); if (process.env.SIMDBG) console.log('  ', checkpoints.at(-1), SLOTS.map(s => p.equip[s] ? `${s[0]}${p.equip[s].ilvl}★${p.equip[s].stars}r${p.equip[s].rar}${p.equip[s].broken ? 'X' : ''}` : '-').join(' '), 'gold', Math.round(p.gold), 'cubes', p.cubes.red, p.cubes.black); nextCheckpoint += 3600; }
   }
-  if (checkpoints.length < hours) checkpoints.push(`${hours}h L${p.lvl} F${p.maxFloor} d${p.stats.deaths}`); // float drift can skip the last one
+  if (checkpoints.length < hours) checkpoints.push(`${hours}h L${p.lvl} F${p.maxFloor} d${p.stats.deaths} raids${p.stats.raids || 0}`); // float drift can skip the last one
   const arch = Object.entries(byArch).map(([k, v]) => `${k}:${(v.t / v.n).toFixed(1)}s/${(100 * v.d / v.n).toFixed(1)}%`).join(' ');
   console.log(name.padEnd(15), checkpoints.slice(-1).join(''), arch);
 }

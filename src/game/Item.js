@@ -7,7 +7,7 @@ import { gearPower } from './curves.js';
 import { rand, pick } from './util.js';
 import { SLOTS, RARITIES, WEAPONS, ITEM_NAMES, MATERIALS, STAR_STATS, BRACKET, BRACKET_POWER_OFFSET } from './data/items.js';
 import { POTENTIALS, POTENTIAL_LINES, CUBES } from './data/potentials.js';
-import { SETS } from './data/sets.js';
+import { SETS, DROP_SETS } from './data/sets.js';
 import {
   STAR_SUCCESS, STAR_DESTROY, STAR_SAFE_FLOORS, STAR_DROP_FROM, CHANCE_TIME_AFTER, SAFEGUARD_FROM, SAFEGUARD_TO,
   SAFEGUARD_COST_MUL, DESTROYED_STARS, REPAIR_COST_MUL, MAX_STARS, starMultiplier, starCostFactor,
@@ -89,8 +89,9 @@ export class Item {
     return it;
   }
 
-  // A piece of a random set: the slot and weapon type come from the set, and the set name replaces the material.
-  static generateSetPiece(ilvl, rarityIdx, setId = pick(Object.keys(SETS))) {
+  // A piece of a set (by default a random non-boss set): the slot and weapon type come from the set,
+  // and the set name replaces the material.
+  static generateSetPiece(ilvl, rarityIdx, setId = pick(DROP_SETS)) {
     const set = SETS[setId], slot = pick(set.slots);
     const it = Item.generate(ilvl, rarityIdx, slot, slot === 'weapon' ? pick(set.weapons) : undefined);
     it.set = setId;

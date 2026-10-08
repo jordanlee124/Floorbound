@@ -10,6 +10,7 @@ export { CLASS_UNLOCK_LEVEL, JOB_NAMES, SP_PER_LEVEL } from './data/classes.js';
 export { SLOTS, SLOT_NAME, RARITIES, WEAPONS, STAR_STATS } from './data/items.js';
 export { POTENTIALS, CUBES } from './data/potentials.js';
 export { SETS } from './data/sets.js';
+export { BOSSES, BOSS_BY_ID, DIFFICULTIES } from './data/bosses.js';
 export { SAFEGUARD_COST_MUL } from './data/starforce.js';
 export { KILLS_PER_FLOOR, POINTS_PER_LEVEL, isBossFloor } from './curves.js';
 export { fmt } from './util.js';

@@ -6,7 +6,7 @@ const STAT_LABEL = { atk: 'Attack', matk: 'Magic', hp: 'HP', def: 'Defense', mre
 const PERCENT_BASE = ['crit', 'critdmg', 'spd'];
 const pct = x => `${Math.round(x * 1000) / 10}%`;
 const SET_LABEL = { atkp: '% Attack', matkp: '% Magic', hpp: '% HP', mpp: '% MP', defp: '% Defense', ls: '% Lifesteal', crit: '% Crit',
-  critdmg: '% Crit damage', spellCrit: '% Spell crit', pen: '% Armor pen', dmg: '% Damage', boss: '% Boss damage', mf: '% Item rarity', gf: '% Gold find' };
+  critdmg: '% Crit damage', spellCrit: '% Spell crit', pen: '% Armor pen', dmg: '% Damage', boss: '% Boss damage', mf: '% Item rarity', gf: '% Gold find', allstat: '% All stats' };
 const setBonusText = b => Object.entries(b).map(([k, v]) => k === 'weaken' ? `Enemies deal ${Math.round(v * 100)}% less damage` : `+${v}${SET_LABEL[k] || ' ' + k}`).join(', ');
 
 // [label, read value from combat stats, shown as percent points?]

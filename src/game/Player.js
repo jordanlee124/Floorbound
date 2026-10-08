@@ -98,6 +98,7 @@ export class Player {
     this.autoSalvage = 0; // salvage drops below this rarity index (0 = off)
     this.lootPopupMin = 1; // show the drop popup for this rarity index and above (5 = never)
     this.stats = { kills: 0, deaths: 0, bosses: 0, best: 0 };
+    this.bossClears = {}; // 'bossId:difficulty' -> time of the last clear (ms)
   }
 
   toJSON() { return { ...this }; }

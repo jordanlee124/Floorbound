@@ -2,10 +2,11 @@
 import { Player } from './Player.js';
 import { Battle } from './Battle.js';
 import { Item } from './Item.js';
-import { Zone } from './Enemy.js';
+import { Enemy, Zone } from './Enemy.js';
 import { CUBES } from './data/potentials.js';
 import { KILLS_PER_FLOOR, POINTS_PER_LEVEL, isBossFloor } from './curves.js';
 import { SET_CHANCE } from './data/sets.js';
+import { BOSSES, BOSS_BY_ID, DIFFICULTIES } from './data/bosses.js';
 import { rand, randInt, fmt } from './util.js';
 
 export class Game {
@@ -14,6 +15,7 @@ export class Game {
     this.player = player;
     this.log = log;
     this.battle = null;
+    this.now = () => Date.now(); // clock for boss resets; the sim replaces it
   }
 
   get zone() { return Zone.forFloor(this.player.floor); }
@@ -34,8 +36,59 @@ export class Game {
 
   // Apply the outcome of a finished battle.
   finishBattle(battle = this.battle) {
-    if (battle.result === 'win') this.#reward(battle);
+    const raid = battle.enemy.raid;
+    if (battle.result === 'win') raid ? this.#raidReward(battle) : this.#reward(battle);
     else if (battle.result === 'lose') this.#defeat(battle);
+  }
+
+  // ---- Boss raids ----
+  // Start of the current reset period: local midnight (daily) or the last Thursday midnight (weekly), as in MapleStory.
+  static resetStart(type, now) {
+    const d = new Date(now); d.setHours(0, 0, 0, 0);
+    if (type === 'weekly') d.setDate(d.getDate() - ((d.getDay() + 3) % 7));
+    return d.getTime();
+  }
+  static nextReset(type, now) {
+    const d = new Date(Game.resetStart(type, now));
+    d.setDate(d.getDate() + (type === 'weekly' ? 7 : 1));
+    return d.getTime();
+  }
+
+  // { unlocked, cleared, resetsAt } for one boss difficulty.
+  bossStatus(id, diff) {
+    const def = BOSS_BY_ID[id], mode = def && def.modes[diff];
+    if (!mode) return null;
+    const now = this.now(), last = this.player.bossClears[`${id}:${diff}`] || 0;
+    return { unlocked: this.player.lvl >= def.level, cleared: last >= Game.resetStart(mode.reset, now), resetsAt: Game.nextReset(mode.reset, now) };
+  }
+  get bossesAvailable() {
+    return BOSSES.some(b => Object.keys(b.modes).some(d => { const s = this.bossStatus(b.id, d); return s.unlocked && !s.cleared; }));
+  }
+
+  // Put a raid boss in front of the player instead of a floor enemy. Returns the battle, or null if not allowed.
+  newBossBattle(id, diff) {
+    const s = this.bossStatus(id, diff);
+    if (!s || !s.unlocked || s.cleared) return null;
+    this.battle = new Battle(this.player, this.log, Enemy.raid(BOSS_BY_ID[id], diff));
+    this.log('enc', `${BOSS_BY_ID[id].name} (${DIFFICULTIES[diff].name}) awaits.`);
+    return this.battle;
+  }
+
+  #raidReward(battle) {
+    const p = this.player, e = battle.enemy, { id, diff } = e.raid, def = BOSS_BY_ID[id], D = DIFFICULTIES[diff];
+    p.bossClears[`${id}:${diff}`] = this.now();
+    p.stats.kills++; p.stats.raids = (p.stats.raids || 0) + 1;
+    const gap = p.lvl - e.f;
+    const exp = Math.round(e.exp * (gap > 5 ? Math.max(0.2, 1 - (gap - 5) * 0.1) : 1));
+    p.gold += e.gold; p.shards += D.shards;
+    for (const k in D.cubes) p.cubes[k] += D.cubes[k];
+    this.log('win', `${def.name} (${D.name}) is defeated! +${fmt(exp)} exp, a boss crystal worth ${fmt(e.gold)} gold, +${D.shards} shards, ${Object.entries(D.cubes).map(([k, n]) => `+${n} ${CUBES[k].name}${n > 1 ? "s" : ""}`).join(', ')}.`);
+    this.#gainExp(exp);
+    const st = battle.stats, ilvl = Item.levelFor(e.f), rar = () => Math.max(D.minRar, Item.rollRarity(st.mf, 3));
+    const drops = [];
+    for (let i = 0; i < D.items; i++) drops.push(Item.generate(ilvl, rar()));
+    if (rand() < D.setChance) drops.push(Item.generateSetPiece(ilvl, rar(), def.set));
+    for (const it of drops) this.#stash(it, battle);
   }
 
   // Change floor by hand. Returns false if that floor is locked.
@@ -119,6 +172,7 @@ export class Game {
     const p = this.player;
     p.stats.deaths++;
     this.log('death', `You were defeated by ${battle.enemy.name}.`);
+    if (battle.enemy.raid) return; // a failed raid can be tried again until it is cleared
     if (p.autoClimb && p.floor > 1) { p.floor--; p.floorKills = 0; this.log('floor', `Retreating to floor ${p.floor}.`); }
   }
 }

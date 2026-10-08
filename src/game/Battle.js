@@ -32,12 +32,12 @@ class SkillContext {
 }
 
 export class Battle {
-  // log(kind, message) receives the fight's play-by-play.
-  constructor(player, log = () => {}) {
+  // log(kind, message) receives the fight's play-by-play. enemy: a floor enemy unless given (a boss raid).
+  constructor(player, log = () => {}, enemy = Enemy.spawn(player.floor)) {
     this.player = player;
     this.log = log;
-    this.stats = player.combatStats(player.floor);
-    this.enemy = Enemy.spawn(player.floor);
+    this.enemy = enemy;
+    this.stats = player.combatStats(enemy.f);
     this.hp = this.stats.hp;
     this.mp = this.stats.mp;
     this.gauge = 0;        // player action gauge; acts at 1
@@ -56,18 +56,19 @@ export class Battle {
   }
 
   get over() { return this.result !== null; }
-  get enraged() { return this.enemy.boss && this.time > BOSS_ENRAGE_AT; }
-  get enrageMultiplier() { return this.enraged ? 1 + 0.25 * Math.floor((this.time - BOSS_ENRAGE_AT) / 5 + 1) : 1; }
+  get enrageAt() { return this.enemy.enrageAt || BOSS_ENRAGE_AT; }
+  get enraged() { return this.enemy.boss && this.time > this.enrageAt; }
+  get enrageMultiplier() { return this.enraged ? 1 + 0.25 * Math.floor((this.time - this.enrageAt) / 5 + 1) : 1; }
 
   // Refresh stats after a gear or point change, keeping the current HP and MP fractions.
   refreshStats() {
     const hpR = this.hp / this.stats.hp, mpR = this.mp / this.stats.mp;
-    this.stats = this.player.combatStats(this.player.floor);
+    this.stats = this.player.combatStats(this.enemy.f);
     this.hp = Math.min(this.stats.hp, hpR * this.stats.hp);
     this.mp = Math.min(this.stats.mp, mpR * this.stats.mp);
   }
   // Full HP and MP with current stats; used when a fight starts.
-  readyUp() { this.stats = this.player.combatStats(this.player.floor); this.hp = this.stats.hp; this.mp = this.stats.mp; }
+  readyUp() { this.stats = this.player.combatStats(this.enemy.f); this.hp = this.stats.hp; this.mp = this.stats.mp; }
 
   // Product of one multiplier key over the active buffs.
   buffProduct(key) {
@@ -184,6 +185,12 @@ export class Battle {
       if (this.minion.t <= 0) this.minion = null;
     }
     if (!e.alive) return this.#end('win');
+    // Raid boss phases: below a share of its HP the boss hits harder and faster.
+    if (e.phases) for (const ph of e.phases) {
+      if (ph.done || e.hpFraction >= ph.at) continue;
+      ph.done = true; e.atk *= ph.atk; e.spd *= ph.spd;
+      this.log('skill', `${ph.text}!`);
+    }
 
     this.gauge += st.spd * this.buffProduct('spdMul') / 100 * dt;
     while (this.gauge >= 1) { this.gauge -= 1; this.#playerAct(); if (!e.alive) return this.#end('win'); }
