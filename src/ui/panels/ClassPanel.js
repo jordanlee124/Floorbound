@@ -1,6 +1,6 @@
 // Current class, the next class choice, and a guide to enemy types.
 import { Panel } from './Panel.js';
-import { Skill, POINTS_PER_LEVEL, CLASS_UNLOCK_LEVEL, SP_PER_LEVEL } from '../../game/index.js';
+import { Skill, POINTS_PER_LEVEL, CLASS_UNLOCK_LEVEL, JOB_NAMES, SP_PER_LEVEL } from '../../game/index.js';
 import { plural } from '../dom.js';
 
 const growthText = g => Object.entries(g).map(([k, v]) => `+${v} ${k.toUpperCase()}`).join(', ');
@@ -41,7 +41,7 @@ export class ClassPanel extends Panel {
         <p class="muted">Advancing is permanent. Growth applies to every level gained since that job unlocks, even if you advance late.</p>`;
     }
     const path = c.lineage.map(x => x.name).join(' → ');
-    const jobs = Object.entries(CLASS_UNLOCK_LEVEL).map(([t, lvl]) => `<li><span>Level ${lvl}</span><b>${['', '1st', '2nd', '3rd', '4th'][t]} job${c.tier >= t ? ' ✓' : ''}</b></li>`).join('');
+    const jobs = Object.entries(CLASS_UNLOCK_LEVEL).map(([t, lvl]) => `<li><span>Level ${lvl}</span><b>${JOB_NAMES[t]}${c.tier >= t ? ' ✓' : ''}</b></li>`).join('');
     return `<div><h2>${c.name} <small>${c.jobName}</small></h2><p>${c.desc}</p>
       <ul class="kv"><li><span>Path</span><b>${path}</b></li><li><span>Growth per level</span><b>${growthText(c.growth)}</b></li>
       <li><span>Per level</span><b>${POINTS_PER_LEVEL} AP, ${SP_PER_LEVEL[Math.max(1, c.tier)]} SP</b></li></ul>${next}

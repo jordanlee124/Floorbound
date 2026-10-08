@@ -1,7 +1,7 @@
 // The fight: both combatants, floor controls, floor progress and the Fight button.
 import { Component } from './Component.js';
 import { $, esc } from './dom.js';
-import { Skill, KILLS_PER_FLOOR, fmt } from '../game/index.js';
+import { Skill, KILLS_PER_FLOOR, BOSS_BY_ID, DIFFICULTIES, fmt } from '../game/index.js';
 
 const bar = (cur, max, cls) => {
   const w = Math.max(0, Math.min(100, cur / max * 100));
@@ -21,11 +21,12 @@ export class BattleView extends Component {
 
   render() {
     const p = this.player, b = this.game.battle, st = b.stats, e = b.enemy;
-    $('#hdr-floor').textContent = `Floor ${p.floor}`;
-    $('#hdr-zone').textContent = this.game.zone.name;
+    const raid = e.raid;
+    $('#hdr-floor').textContent = raid ? 'Boss raid' : `Floor ${p.floor}`;
+    $('#hdr-zone').textContent = raid ? `${DIFFICULTIES[raid.diff].name} · floor ${e.f} power` : this.game.zone.name;
     $('#you').innerHTML = this.#playerCard(p, b, st);
     $('#foe').innerHTML = this.#enemyCard(b, e);
-    $('#floor-prog').textContent = this.#progressText(p);
+    $('#floor-prog').textContent = raid ? `${BOSS_BY_ID[raid.id].name}. After this fight, Fight returns you to floor ${p.floor}.` : this.#progressText(p);
     $('#floor-max').textContent = `Highest floor unlocked: ${p.maxFloor}`;
     $('#rest').textContent = this.#statusText(b);
     this.renderControls();
@@ -61,7 +62,7 @@ export class BattleView extends Component {
     if (b.slow) chips.push('<em class="bad">Slowed</em>');
     if (b.stun > 0) chips.push('<em class="bad">Stunned</em>');
     if (b.enraged) chips.push('<em class="bad">Enraged</em>');
-    const enrage = e.boss ? `<span>Enrage ${Math.max(0, 40 - b.time).toFixed(0)}s</span>` : '';
+    const enrage = e.boss ? `<span>Enrage ${Math.max(0, b.enrageAt - b.time).toFixed(0)}s</span>` : '';
     return `<div class="who"><b class="${e.boss ? 'boss' : e.elite ? 'elite' : ''}">${esc(e.name)}</b><small>${e.boss ? 'Boss · ' : ''}${e.tag || 'Normal'} · ${e.dmg === 'magic' ? 'magic attacks' : 'physical attacks'}</small></div>
       ${bar(e.hp, e.maxhp, 'ehp')}
       <div class="foe-stats"><span>Armor ${Math.round(e.pr * 100)}%</span><span>Ward ${Math.round(e.mr * 100)}%</span><span>Evade ${Math.round(e.eva * 100)}%</span>${enrage}</div>
@@ -77,6 +78,7 @@ export class BattleView extends Component {
   #statusText(b) {
     if (this.app.fighting) return '';
     if (b.result === 'lose') return 'Defeated';
+    if (b.enemy.raid) return b.result === 'win' ? 'Boss defeated' : '';
     if (this.game.floorCleared) return 'Floor cleared. Go up with ▶';
     return b.result === 'win' ? 'Victory' : '';
   }

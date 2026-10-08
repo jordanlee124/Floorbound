@@ -1,13 +1,13 @@
-// Class definitions, MapleStory-style: Novice, then a job advancement at levels 10, 30, 60 and 100.
+// Class definitions, MapleStory-style: Novice, then a job advancement at levels 10, 30, 60, 100 and 200.
 // `growth` is the free attribute gain per level while in that class (on top of AP).
-export const CLASS_UNLOCK_LEVEL = { 1: 10, 2: 30, 3: 60, 4: 100 };
-export const JOB_NAMES = ['Novice', '1st job', '2nd job', '3rd job', '4th job'];
+export const CLASS_UNLOCK_LEVEL = { 1: 10, 2: 30, 3: 60, 4: 100, 5: 200 };
+export const JOB_NAMES = ['Novice', '1st job', '2nd job', '3rd job', '4th job', '5th job'];
 
 // SP per level, banked into the skill book of the job those levels belong to (Novice: levels 1-9, 1st job: 10-29, ...).
 // SP from a job's levels can only be spent on that job's skills, as in MapleStory.
-export const SP_PER_LEVEL = [1, 3, 3, 3, 3];
+export const SP_PER_LEVEL = [1, 3, 3, 3, 3, 3];
 // Skill max rank by job.
-export const MAX_RANK = [10, 20, 30, 30, 30];
+export const MAX_RANK = [10, 20, 30, 30, 30, 30];
 
 export const CLASS_DEFS = {
   novice: { name: 'Novice', tier: 0, growth: { str: 1, dex: 1, int: 1, vit: 1 }, hpMul: 1, mpMul: 1,
@@ -63,21 +63,41 @@ export const CLASS_DEFS = {
     desc: 'Faster spells, more drain, and a plague that weakens everything.' },
 
   warlord: { name: 'Warlord', tier: 4, parent: 'reaver', growth: { str: 4, vit: 2 }, hpMul: 1.25, mpMul: 0.9,
-    skills: ['raging_blow', 'unbreakable', 'berserk_mastery'], next: [],
+    skills: ['raging_blow', 'unbreakable', 'berserk_mastery'], next: ['doombringer'],
     desc: 'The final warrior. Four-hit blows and a body that will not fall.' },
   lightbringer: { name: 'Lightbringer', tier: 4, parent: 'templar', growth: { str: 2, vit: 4 }, hpMul: 1.45, mpMul: 1,
-    skills: ['judgment', 'divine_aura', 'guardian'], next: [],
+    skills: ['judgment', 'divine_aura', 'guardian'], next: ['seraph'],
     desc: 'Judgment scales with HP. The hardest class to kill in the game.' },
   shadowlord: { name: 'Shadowlord', tier: 4, parent: 'nightblade', growth: { dex: 4, luk: 2 }, hpMul: 1, mpMul: 1,
-    skills: ['death_mark', 'phantom_step', 'killing_spree'], next: [],
+    skills: ['death_mark', 'phantom_step', 'killing_spree'], next: ['wraith'],
     desc: 'Death Mark always crits. Untouchable at its best, finishes anything wounded.' },
   stormbow: { name: 'Stormbow', tier: 4, parent: 'sharpshooter', growth: { dex: 3, luk: 3 }, hpMul: 1.05, mpMul: 1,
-    skills: ['arrow_storm', 'wind_mastery', 'deadeye'], next: [],
+    skills: ['arrow_storm', 'wind_mastery', 'deadeye'], next: ['tempest'],
     desc: 'Arrow Storm fires eight shots. Fastest attacker, best loot luck.' },
   archmage: { name: 'Archmage', tier: 4, parent: 'infernalist', growth: { int: 6 }, hpMul: 0.9, mpMul: 1.5,
-    skills: ['cataclysm', 'arcane_overload', 'elemental_mastery'], next: [],
+    skills: ['cataclysm', 'arcane_overload', 'elemental_mastery'], next: ['pyrarch'],
     desc: 'Cataclysm is the biggest single hit in the game. Paper-thin.' },
   lich: { name: 'Lich', tier: 4, parent: 'deathcaller', growth: { int: 4, vit: 2 }, hpMul: 1.15, mpMul: 1.4,
-    skills: ['army_of_dead', 'phylactery', 'death_mastery'], next: [],
+    skills: ['army_of_dead', 'phylactery', 'death_mastery'], next: ['deathlord'],
     desc: 'A stronger undead army and a body that pays in MP before HP.' },
+
+  // 5th job adds no new attacks. Boosts upgrade the attacks you already have; the rest are passives.
+  doombringer: { name: 'Doombringer', tier: 5, parent: 'warlord', growth: { str: 4, vit: 3 }, hpMul: 1.3, mpMul: 0.9,
+    skills: ['raging_blow_boost', 'rampage_boost', 'endless_wrath', 'titans_will'], next: [],
+    desc: 'Raging Blow, Brutal Swing, Rampage and Cleave hit harder and come back sooner. More rage, more body.' },
+  seraph: { name: 'Seraph', tier: 5, parent: 'lightbringer', growth: { str: 3, vit: 4 }, hpMul: 1.5, mpMul: 1,
+    skills: ['judgment_boost', 'holy_strike_boost', 'radiance', 'holy_bastion'], next: [],
+    desc: 'Judgment, Blessed Hammer, Holy Strike and Cleave are upgraded. Light that punishes every blow.' },
+  wraith: { name: 'Wraith', tier: 5, parent: 'shadowlord', growth: { dex: 5, luk: 2 }, hpMul: 1.05, mpMul: 1,
+    skills: ['death_mark_boost', 'assassinate_boost', 'shadow_sovereign', 'umbral_veil'], next: [],
+    desc: 'Death Mark, Shadow Flurry, Assassinate and Twin Strike are upgraded. Crits cut deeper.' },
+  tempest: { name: 'Tempest', tier: 5, parent: 'stormbow', growth: { dex: 4, luk: 3 }, hpMul: 1.1, mpMul: 1,
+    skills: ['arrow_storm_boost', 'volley_boost', 'gale_force', 'storms_eye'], next: [],
+    desc: 'Arrow Storm, Piercing Arrow, Volley and Snare Trap are upgraded. Faster still, deadlier on bosses.' },
+  pyrarch: { name: 'Pyrarch', tier: 5, parent: 'archmage', growth: { int: 7 }, hpMul: 0.95, mpMul: 1.6,
+    skills: ['cataclysm_boost', 'meteor_boost', 'sunfire', 'ember_ward'], next: [],
+    desc: 'Cataclysm, Flame Pillar, Meteor, Inferno and Fireball are upgraded. Burns run hotter.' },
+  deathlord: { name: 'Deathlord', tier: 5, parent: 'lich', growth: { int: 5, vit: 2 }, hpMul: 1.2, mpMul: 1.45,
+    skills: ['army_boost', 'drain_boost', 'soul_harvest', 'bone_armor'], next: [],
+    desc: 'Army of the Dead, Bone Spear, Soul Siphon and Life Drain are upgraded. Everything nearby withers.' },
 };

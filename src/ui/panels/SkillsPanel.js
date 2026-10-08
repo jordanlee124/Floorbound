@@ -52,8 +52,8 @@ export class SkillsPanel extends Panel {
       confirmLabel: `Confirm reset (${fmt(cost)} gold)`, action: 'reset-skills', enabled: p.gold >= cost,
     });
     return `<div><h2>Skills <small>${p.skillPts} SP to spend</small></h2>
-      <p class="muted">Each job has its own skill book. Levels in a job's range (Novice 1-9, 1st job 10-29, 2nd 30-59, 3rd 60-99, 4th 100+) give SP that can only go into that job's skills.</p>
-      <p class="muted">Up to ${p.rotationSize} active skills fire automatically, in rotation order, whenever they are off cooldown and you have the MP. Otherwise you basic attack. Passives are always on. The rotation grows by one at 3rd and 4th job.</p>
+      <p class="muted">Each job has its own skill book. Levels in a job's range (Novice 1-9, 1st job 10-29, 2nd 30-59, 3rd 60-99, 4th 100-199, 5th 200+) give SP that can only go into that job's skills.</p>
+      <p class="muted">Up to ${p.rotationSize} active skills fire automatically, in rotation order, whenever they are off cooldown and you have the MP. Otherwise you basic attack. Passives and boosts are always on; a boost upgrades attacks you already have. The rotation grows by one at 3rd, 4th and 5th job.</p>
       ${waiting > 0 ? `<p class="muted">${waiting} SP is waiting for your ${adv.options[0].jobName} skills. Advance in the Class tab to use it.</p>` : ''}
       ${groups}
       <div class="row">${reset}</div></div>`;

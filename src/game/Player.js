@@ -4,9 +4,10 @@ import { CharacterClass } from './CharacterClass.js';
 import { Skill } from './Skill.js';
 import { expToLevel, POINTS_PER_LEVEL } from './curves.js';
 import { clamp } from './util.js';
-import { SLOTS, WEAPONS } from './data/items.js';
+import { SLOTS, SLOT_TYPE, WEAPONS } from './data/items.js';
 import { CLASS_DEFS, SP_PER_LEVEL } from './data/classes.js';
 import { CUBES } from './data/potentials.js';
+import { SETS } from './data/sets.js';
 import './data/skills.js';
 
 export const ATTRS = ['str', 'dex', 'int', 'vit', 'luk'];
@@ -18,7 +19,7 @@ export const ATTR_INFO = {
   luk: 'Luck: +0.2% crit, +0.6% crit damage, +0.6% item rarity and gold',
 };
 export const BAG_SIZE = 60;
-export const ROTATION_SIZE = 3; // grows by one at 3rd and at 4th job
+export const ROTATION_SIZE = 3; // grows by one at 3rd, 4th and 5th job
 const SAVE_VERSION = 2;
 
 // Every stat sum gear and passives can add to. Passive skills write into a copy of this.
@@ -31,6 +32,7 @@ export class Player {
   static create() {
     const p = new Player();
     p.equip.weapon = Item.generate(1, 0, 'weapon', 'Sword');
+    delete p.equip.weapon.job; // the starter sword is common, so every job can keep it
     p.equip.armor = Item.generate(1, 0, 'armor');
     p.skills.power_strike = 1;
     return p;
@@ -97,6 +99,7 @@ export class Player {
     this.autoSalvage = 0; // salvage drops below this rarity index (0 = off)
     this.lootPopupMin = 1; // show the drop popup for this rarity index and above (5 = never)
     this.stats = { kills: 0, deaths: 0, bosses: 0, best: 0 };
+    this.bossClears = {}; // 'bossId:difficulty' -> time of the last clear (ms)
   }
 
   toJSON() { return { ...this }; }
@@ -173,7 +176,7 @@ export class Player {
 
   // ---- Skills ----
   // Each job has its own SP book, filled by the levels that belong to that job (Novice 1-9, 1st job 10-29,
-  // 2nd job 30-59, 3rd job 60-99, 4th job 100+), whether or not you have advanced yet.
+  // 2nd job 30-59, 3rd job 60-99, 4th job 100-199, 5th job 200+), whether or not you have advanced yet.
   get knownSkillIds() { return this.characterClass.allSkillIds; }
   skillRank(id) { return this.skills[id] || 0; }
   get rotationSize() { return ROTATION_SIZE + Math.max(0, this.characterClass.tier - 2); }
@@ -184,7 +187,7 @@ export class Player {
     const levels = Math.max(0, Math.min(this.lvl, next ? next - 1 : Infinity) - from + 1);
     return levels * SP_PER_LEVEL[tier];
   }
-  get spEarnedTotal() { return [0, 1, 2, 3, 4].reduce((s, t) => s + this.spEarned(t), 0); }
+  get spEarnedTotal() { return SP_PER_LEVEL.reduce((s, _, t) => s + this.spEarned(t), 0); }
   // Unspent SP in one job's book.
   spFor(tier) {
     const c = this.characterClass.lineage[tier];
@@ -227,15 +230,38 @@ export class Player {
   }
 
   // ---- Gear & bag ----
+  // Job branch for class gear: the 1st job in the lineage (warrior, rogue or mage), or null for a Novice.
+  get job() { const c = this.characterClass.lineage[1]; return c ? c.id : null; }
+  // Class gear needs the matching job; a Novice can wear any gear below item level 10.
+  canEquip(it) { return !it.job || it.job === this.job || (!this.job && it.ilvl < 10); }
   get bagFull() { return this.inv.length >= BAG_SIZE; }
   findItem(id) { return this.inv.find(x => x.id === id) || SLOTS.map(s => this.equip[s]).find(x => x && x.id === id); }
-  isEquipped(item) { return this.equip[item.slot] === item; }
+  // The equip slot an item is in, or undefined.
+  equippedAt(item) { return SLOTS.find(s => this.equip[s] === item); }
+  isEquipped(item) { return !!this.equippedAt(item); }
+  // Equip slots that take this item's type (four for rings).
+  slotsFor(item) { return SLOTS.filter(s => SLOT_TYPE[s] === item.slot); }
+  // Whether the item may go into this slot: right type, right class, and never two rings of the same kind.
+  canEquipAt(item, slot, equip = this.equip) {
+    if (SLOT_TYPE[slot] !== item.slot || !this.canEquip(item)) return false;
+    return item.slot !== 'ring' || !SLOTS.some(s => s !== slot && SLOT_TYPE[s] === 'ring' && equip[s] && equip[s] !== item && equip[s].ringKind === item.ringKind);
+  }
+  // Where Equip puts an item: the ring of the same kind, else an empty ring slot; null when the player must pick a ring to replace.
+  equipTarget(item) {
+    const ok = this.slotsFor(item).filter(s => this.canEquipAt(item, s));
+    if (item.slot !== 'ring') return ok[0] || null;
+    return ok.find(s => this.equip[s] && this.equip[s].ringKind === item.ringKind) || ok.find(s => !this.equip[s]) || null;
+  }
 
-  equipItem(id) {
+  // Equip from the bag into `slot` (default: equipTarget). Whatever was there goes back to the bag.
+  equipItem(id, slot) {
     const i = this.inv.findIndex(x => x.id === id); if (i < 0) return null;
-    const it = this.inv[i]; this.inv.splice(i, 1);
-    if (this.equip[it.slot]) this.inv.push(this.equip[it.slot]);
-    this.equip[it.slot] = it;
+    const it = this.inv[i];
+    slot = slot || this.equipTarget(it);
+    if (!slot || !this.canEquipAt(it, slot)) return null;
+    this.inv.splice(i, 1);
+    if (this.equip[slot]) this.inv.push(this.equip[slot]);
+    this.equip[slot] = it;
     return it;
   }
   unequip(slot) {
@@ -291,17 +317,29 @@ export class Player {
     return { ok: true, item: it, ...it.rollCube(type) };
   }
 
+  // Item sets worn: [{ id, set, count, active: [n, ...] }], where active lists the piece counts whose bonuses are on.
+  // A destroyed piece does not count.
+  activeSets(equip = this.equip) {
+    const types = {}; // set id -> item types worn; several rings of one set count as one ring piece
+    for (const sl of SLOTS) { const it = equip[sl]; if (it && it.set && !it.broken) (types[it.set] ||= new Set()).add(it.slot); }
+    return Object.entries(types).map(([id, t]) => {
+      const set = SETS[id], count = t.size;
+      return { id, set, count, active: Object.keys(set.bonus).map(Number).filter(n => n <= count) };
+    });
+  }
+
   // ---- Combat stats ----
   // floor: defense and evasion are measured against the floor you fight on.
   // equipOverride: preview stats with different gear without changing anything.
   combatStats(floor = this.floor, equipOverride = null) {
     const eq = equipOverride || this.equip;
-    const g = { ...EMPTY_MODS };
+    const g = { ...EMPTY_MODS, skillDmg: {}, skillCd: {} }; // skillDmg/skillCd: 5th job boosts, skill id -> percent
     for (const sl of SLOTS) { const it = eq[sl]; if (!it) continue; const is = it.stats; for (const k in is) g[k] = (g[k] || 0) + is[k]; }
     for (const id of this.knownSkillIds) {
       const r = this.skillRank(id); const sk = Skill.get(id);
       if (r && !sk.isActive) sk.apply(g, r);
     }
+    for (const s of this.activeSets(eq)) for (const n of s.active) { const b = s.set.bonus[n]; for (const k in b) g[k] += b[k]; }
     const a = this.attributes;
     for (const k of ATTRS) a[k] = (a[k] + g[k]) * (1 + g.allstat / 100);
     const c = this.characterClass;
@@ -325,6 +363,7 @@ export class Player {
     const eva = a.dex * 1 + g.eva;
     st.dodge = clamp(eva / (eva + 150 + 10 * floor), 0, 0.35) + g.dodgeFlat;
     st.dmg = g.dmg; st.boss = g.boss;
+    st.skillDmg = g.skillDmg; st.skillCd = g.skillCd;
     st.ls = g.ls; st.pen = Math.min(80, g.pen);
     st.mf = a.luk * 0.6 + g.mf; st.gf = a.luk * 0.6 + g.gf;
     st.hpRegen = g.hpRegen; st.frenzy = g.frenzy; st.reflect = g.reflect; st.execute = g.execute;

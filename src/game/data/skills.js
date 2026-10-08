@@ -1,6 +1,6 @@
 // Every skill in the game. Importing this file registers them with Skill.get().
-// Max ranks follow the job (MAX_RANK): Novice 10, 1st job 20, 2nd to 4th job 30.
-import { Skill, ActiveSkill, PassiveSkill } from '../Skill.js';
+// Max ranks follow the job (MAX_RANK): Novice 10, 1st job 20, 2nd to 5th job 30.
+import { Skill, ActiveSkill, PassiveSkill, BoostSkill } from '../Skill.js';
 import { MAX_RANK } from './classes.js';
 
 const pct = v => Math.round(v * 100) + '%';
@@ -8,6 +8,8 @@ const n1 = v => +v.toFixed(1); // one decimal, trailing zero dropped
 let max = 0; // max rank for the job section being defined below
 const active = (id, def) => Skill.register(new ActiveSkill(id, { max, ...def }));
 const passive = (id, def) => Skill.register(new PassiveSkill(id, { max, ...def }));
+// 5th job boost: +4% damage and 1% shorter cooldown per rank for each target (+120% and -30% at rank 30).
+const boost = (id, name, targets) => Skill.register(new BoostSkill(id, { max, name, targets, dmg: 4, cd: 1 }));
 
 // ---- Novice ----
 max = MAX_RANK[0];
@@ -263,3 +265,61 @@ passive('phylactery', { name: 'Phylactery',
 passive('death_mastery', { name: 'Death Mastery',
   describe: r => `+${r}% Magic, +${n1(0.5 * r)}% damage.`,
   apply: (s, r) => { s.matkp += r; s.dmg += 0.5 * r; } });
+
+// ---- 5th job ----
+// No new attacks: two boosts upgrade the lineage's existing attacks, two passives add on top.
+max = MAX_RANK[5];
+// Doombringer
+boost('raging_blow_boost', 'Raging Blow Boost', ['raging_blow', 'brutal_swing']);
+boost('rampage_boost', 'Rampage Boost', ['rampage', 'cleave']);
+passive('endless_wrath', { name: 'Endless Wrath',
+  describe: r => `+${r}% damage, +${n1(0.2 * r)}% lifesteal.`,
+  apply: (s, r) => { s.dmg += r; s.ls += 0.2 * r; } });
+passive('titans_will', { name: "Titan's Will",
+  describe: r => `+${r}% HP. Enemies deal ${n1(0.3 * r)}% less damage.`,
+  apply: (s, r) => { s.hpp += r; s.weaken += 0.003 * r; } });
+// Seraph
+boost('judgment_boost', 'Judgment Boost', ['judgment', 'blessed_hammer']);
+boost('holy_strike_boost', 'Holy Strike Boost', ['holy_strike', 'cleave']);
+passive('radiance', { name: 'Radiance',
+  describe: r => `+${r}% damage, +${r}% boss damage.`,
+  apply: (s, r) => { s.dmg += r; s.boss += r; } });
+passive('holy_bastion', { name: 'Holy Bastion',
+  describe: r => `+${r}% HP, +${r}% Defense. Reflect ${n1(0.5 * r)}% more damage taken.`,
+  apply: (s, r) => { s.hpp += r; s.defp += r; s.reflect += 0.005 * r; } });
+// Wraith
+boost('death_mark_boost', 'Death Mark Boost', ['death_mark', 'shadow_flurry']);
+boost('assassinate_boost', 'Assassinate Boost', ['assassinate', 'twin_strike']);
+passive('shadow_sovereign', { name: 'Shadow Sovereign',
+  describe: r => `+${2 * r}% crit damage, +${n1(0.5 * r)}% armor penetration.`,
+  apply: (s, r) => { s.critdmg += 2 * r; s.pen += 0.5 * r; } });
+passive('umbral_veil', { name: 'Umbral Veil',
+  describe: r => `+${n1(0.2 * r)}% chance to dodge, +${r}% HP.`,
+  apply: (s, r) => { s.dodgeFlat += 0.002 * r; s.hpp += r; } });
+// Tempest
+boost('arrow_storm_boost', 'Arrow Storm Boost', ['arrow_storm', 'piercing_arrow']);
+boost('volley_boost', 'Volley Boost', ['volley', 'snare']);
+passive('gale_force', { name: 'Gale Force',
+  describe: r => `+${n1(0.5 * r)}% speed, +${n1(0.5 * r)}% damage.`,
+  apply: (s, r) => { s.spd += 0.5 * r; s.dmg += 0.5 * r; } });
+passive('storms_eye', { name: "Storm's Eye",
+  describe: r => `+${n1(0.3 * r)}% crit chance, +${r}% boss damage.`,
+  apply: (s, r) => { s.crit += 0.3 * r; s.boss += r; } });
+// Pyrarch
+boost('cataclysm_boost', 'Cataclysm Boost', ['cataclysm', 'flame_pillar']);
+boost('meteor_boost', 'Meteor Boost', ['meteor', 'inferno', 'fireball']);
+passive('sunfire', { name: 'Sunfire',
+  describe: r => `+${r}% Magic. Burns deal +${r}% Magic per second.`,
+  apply: (s, r) => { s.matkp += r; s.ignite += 0.01 * r; } });
+passive('ember_ward', { name: 'Ember Ward',
+  describe: r => `+${r}% HP. ${n1(0.5 * r)}% of damage taken drains MP instead of HP.`,
+  apply: (s, r) => { s.hpp += r; s.manaShield += 0.005 * r; } });
+// Deathlord
+boost('army_boost', 'Army Boost', ['army_of_dead', 'bone_spear']);
+boost('drain_boost', 'Drain Boost', ['soul_siphon', 'life_drain']);
+passive('soul_harvest', { name: 'Soul Harvest',
+  describe: r => `+${r}% damage. Enemies take +${n1(0.3 * r)}% damage.`,
+  apply: (s, r) => { s.dmg += r; s.vuln += 0.003 * r; } });
+passive('bone_armor', { name: 'Bone Armor',
+  describe: r => `+${r}% HP. Enemies deal ${n1(0.3 * r)}% less damage.`,
+  apply: (s, r) => { s.hpp += r; s.weaken += 0.003 * r; } });

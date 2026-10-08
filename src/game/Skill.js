@@ -43,3 +43,18 @@ export class PassiveSkill extends Skill {
   // mods is the stat-sum object built in Player.combatStats()
   apply(mods, rank) { this.applyFn(mods, rank); }
 }
+
+// A 5th job upgrade to attacks you already have: more damage and a shorter cooldown for each target skill.
+// It writes into mods.skillDmg / mods.skillCd (skill id -> percent), which Battle reads when a skill fires.
+export class BoostSkill extends PassiveSkill {
+  constructor(id, { targets, dmg, cd, ...rest }) {
+    super(id, {
+      ...rest,
+      describe: r => `${targets.map(t => Skill.get(t).name).join(', ')}: +${dmg * r}% damage, ${+(cd * r).toFixed(1)}% shorter cooldown.`,
+      apply: (s, r) => { for (const t of targets) { s.skillDmg[t] = (s.skillDmg[t] || 0) + dmg * r; s.skillCd[t] = (s.skillCd[t] || 0) + cd * r; } },
+    });
+    this.targets = targets;
+  }
+
+  get type() { return 'boost'; }
+}
