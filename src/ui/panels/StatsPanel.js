@@ -1,7 +1,6 @@
-// Attribute points and the derived combat stats they produce.
+// Ability points (AP) and the derived combat stats they produce.
 import { Panel } from './Panel.js';
-import { ATTRS, ATTR_INFO, fmt } from '../../game/index.js';
-import { plural } from '../dom.js';
+import { ATTRS, ATTR_INFO, POINTS_PER_LEVEL, fmt } from '../../game/index.js';
 
 export class StatsPanel extends Panel {
   static id = 'stats';
@@ -10,6 +9,7 @@ export class StatsPanel extends Panel {
   get actions() {
     return {
       allocate: ({ attr, n }) => this.player.allocate(attr, Number(n)),
+      'auto-assign': () => this.player.autoAssign(),
       'reset-attributes': () => { if (this.player.resetAttributes()) this.game.log('level', 'Attribute points reset.'); },
     };
   }
@@ -28,12 +28,14 @@ export class StatsPanel extends Panel {
       ['Item rarity', `+${st.mf.toFixed(0)}%`], ['Gold find', `+${st.gf.toFixed(0)}%`], ['Basic attack', st.basic === 'magic' ? 'Magic bolt' : 'Physical'],
     ].map(([k, v]) => `<li><span>${k}</span><b>${v}</b></li>`).join('');
     const cost = p.respecCost;
+    const growth = Object.keys(p.characterClass.growth).map(k => k.toUpperCase()).join('/');
     const reset = this.confirmButton('reset-attributes', {
-      label: `Reset points (${cost ? fmt(cost) + ' gold' : 'free before level 10'})`,
+      label: `Reset AP (${cost ? fmt(cost) + ' gold' : 'free before level 10'})`,
       confirmLabel: `Confirm reset (${fmt(cost)} gold)`, action: 'reset-attributes', enabled: p.gold >= cost,
     });
-    return `<div class="stats"><section><h2>Attributes <small>${plural(p.statPts, 'point')} to spend</small></h2><ul class="attrs">${rows}</ul>
-      <div class="row">${reset}</div></section>
+    return `<div class="stats"><section><h2>Attributes <small>${p.statPts} AP to spend</small></h2>
+      <p class="muted">You get ${POINTS_PER_LEVEL} AP every level. Auto-assign spends it all in your class's ${growth} ratio.</p><ul class="attrs">${rows}</ul>
+      <div class="row"><button data-act="auto-assign" ${p.statPts ? '' : 'disabled'}>Auto-assign</button>${reset}</div></section>
       <section><h2>Combat stats <small>on floor ${p.floor}</small></h2><ul class="derived">${derived}</ul>
       <p class="muted">Defense and resist are measured against your current floor, so the same gear blocks less as you climb.</p></section></div>`;
   }

@@ -48,8 +48,12 @@ export class Game {
 
   #gainExp(amount) {
     const p = this.player;
+    const spBefore = p.spEarnedTotal;
     const ups = p.gainExp(amount);
-    if (ups) this.log('level', `Level up! You are now level ${p.lvl}. +${POINTS_PER_LEVEL * ups} stat points, +${ups} skill point${ups > 1 ? 's' : ''}.`);
+    if (!ups) return;
+    this.log('level', `Level up! You are now level ${p.lvl}. +${POINTS_PER_LEVEL * ups} AP, +${p.spEarnedTotal - spBefore} SP.`);
+    const adv = p.advancement;
+    if (adv && adv.ready && p.lvl - ups < adv.level) this.log('level', `Your ${adv.options[0].jobName} advancement is ready in the Class tab.`);
   }
 
   #reward(battle) {

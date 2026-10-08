@@ -21,6 +21,18 @@ Runs on the web and on Android. The Android app is the same web build wrapped wi
 | `npm run android:open` | Open the Android project in Android Studio |
 | `npm run android:run` | Build, sync and run on a connected device or emulator |
 
+## Character progression
+
+Leveling works like MapleStory's.
+
+- **Job advancements.** Everyone starts as a Novice. You advance to 1st job at level 10 (Warrior, Rogue or Mage), 2nd job at 30 (two choices per class), 3rd job at 60 and 4th job at 100. Each job brings its own skills and attribute growth. Advancing is permanent.
+- **AP.** Every level gives 5 AP to put into STR, DEX, INT, VIT or LUK. Auto-assign spends it in your class's ratio.
+- **SP and skill books.** Every level gives 3 SP (1 as a Novice) into the skill book of the job those levels belong to: Novice 1-9, 1st job 10-29, 2nd job 30-59, 3rd job 60-99, 4th job 100+. SP can only be spent on that job's skills. Max ranks are 10 (Novice), 20 (1st job) and 30 (2nd to 4th job).
+- **Rotation.** Up to 3 actives fire on their own, 4 at 3rd job and 5 at 4th.
+- **EXP curve.** The Novice levels go fast, then each level costs a bit more than the last, so 3rd and 4th job are a real grind.
+
+Old saves are converted when they load: skill ranks are scaled to the new max ranks, each job's book is trimmed back to the SP that job's levels give, and you get the extra AP for the levels you already have. The tables live in `src/game/data/classes.js` and `src/game/data/skills.js`.
+
 ## Gear progression
 
 Gear works like MapleStory's.

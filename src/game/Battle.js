@@ -13,7 +13,7 @@ class SkillContext {
   get stats() { return this.battle.stats; }
   hit(mult, type, opts) {
     const b = this.battle;
-    const base = type === 'magic' ? b.stats.matk : b.stats.atk * b.attackMultiplier;
+    const base = type === 'magic' ? b.stats.matk * b.buffProduct('matkMul') : b.stats.atk * b.attackMultiplier;
     return b.playerHit(base * mult, type, { label: this.label, ...opts });
   }
   hitRaw(raw, type, opts) { return this.battle.playerHit(raw * this.battle.attackMultiplier, type, { label: this.label, ...opts }); }
@@ -27,7 +27,7 @@ class SkillContext {
   stun(duration) { this.battle.stun = Math.max(this.battle.stun, duration); }
   slow(fraction, duration) { this.battle.slow = fraction; this.battle.slowT = duration; }
   heal(amount) { const b = this.battle; b.hp = Math.min(b.stats.hp, b.hp + amount); }
-  minion(dmg, duration) { this.battle.minion = { dmg, t: duration, acc: 0 }; this.battle.log('skill', `${this.label}: a skeleton rises.`); }
+  minion(dmg, duration, text = 'a skeleton rises') { this.battle.minion = { name: this.label, dmg, t: duration, acc: 0 }; this.battle.log('skill', `${this.label}: ${text}.`); }
 }
 
 export class Battle {
@@ -42,7 +42,7 @@ export class Battle {
     this.gauge = 0;        // player action gauge; acts at 1
     this.enemyGauge = 0;
     this.shield = 0; this.shieldT = 0;
-    this.buffs = {};       // id -> { t, name, atkMul? }
+    this.buffs = {};       // id -> { t, name, atkMul?, matkMul?, dmgMul?, spdMul?, critAdd? }
     this.dots = [];        // damage over time on the enemy
     this.cooldowns = {};   // skill id -> seconds left
     this.stun = 0;         // enemy stunned seconds
@@ -68,17 +68,24 @@ export class Battle {
   // Full HP and MP with current stats; used when a fight starts.
   readyUp() { this.stats = this.player.combatStats(this.player.floor); this.hp = this.stats.hp; this.mp = this.stats.mp; }
 
-  get attackMultiplier() {
+  // Product of one multiplier key over the active buffs.
+  buffProduct(key) {
     let m = 1;
-    for (const k in this.buffs) if (this.buffs[k].atkMul) m *= this.buffs[k].atkMul;
+    for (const k in this.buffs) if (this.buffs[k][key]) m *= this.buffs[k][key];
     return m;
   }
+  buffSum(key) {
+    let s = 0;
+    for (const k in this.buffs) if (this.buffs[k][key]) s += this.buffs[k][key];
+    return s;
+  }
+  get attackMultiplier() { return this.buffProduct('atkMul'); }
   get damageMultiplier() {
     const st = this.stats, e = this.enemy;
     let m = 1 + st.vuln + st.dmg / 100 + (e.boss ? st.boss / 100 : 0);
     if (st.frenzy) m += st.frenzy * Math.floor((1 - this.hp / st.hp) * 10);
     if (st.execute && e.hpFraction < 0.35) m += st.execute;
-    return m;
+    return m * this.buffProduct('dmgMul');
   }
 
   playerHit(raw, type, opts = {}) {
@@ -89,7 +96,7 @@ export class Battle {
       if (rand() < miss) { this.log('miss', `${e.name} evades.`); return 0; }
     }
     let d = raw * this.damageMultiplier;
-    const critChance = st.crit + (type === 'magic' ? st.spellCrit : 0);
+    const critChance = st.crit + this.buffSum('critAdd') + (type === 'magic' ? st.spellCrit : 0);
     const crit = opts.crit || rand() * 100 < critChance;
     if (crit) d *= st.critdmg / 100;
     if (type === 'phys') d *= 1 - e.pr * (1 - st.pen / 100);
@@ -120,7 +127,7 @@ export class Battle {
       sk.cast(new SkillContext(this, sk.name), r);
       return;
     }
-    if (this.stats.basic === 'magic') this.playerHit(this.stats.matk, 'magic', { label: 'Your bolt hits' });
+    if (this.stats.basic === 'magic') this.playerHit(this.stats.matk * this.buffProduct('matkMul'), 'magic', { label: 'Your bolt hits' });
     else this.playerHit(this.stats.atk * this.attackMultiplier, 'phys', { label: 'You hit' });
   }
 
@@ -170,13 +177,13 @@ export class Battle {
       if (this.minion.acc >= 1) {
         this.minion.acc -= 1;
         const dmg = this.minion.dmg * this.damageMultiplier * (1 - e.mr);
-        e.hp -= dmg; this.log('dot', `Skeleton claws for ${fmt(dmg)}.`);
+        e.hp -= dmg; this.log('dot', `${this.minion.name} deals ${fmt(dmg)}.`);
       }
       if (this.minion.t <= 0) this.minion = null;
     }
     if (!e.alive) return this.#end('win');
 
-    this.gauge += st.spd / 100 * dt;
+    this.gauge += st.spd * this.buffProduct('spdMul') / 100 * dt;
     while (this.gauge >= 1) { this.gauge -= 1; this.#playerAct(); if (!e.alive) return this.#end('win'); }
 
     if (this.stun > 0) this.stun -= dt;

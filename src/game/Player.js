@@ -5,6 +5,7 @@ import { Skill } from './Skill.js';
 import { expToLevel, POINTS_PER_LEVEL } from './curves.js';
 import { clamp } from './util.js';
 import { SLOTS, WEAPONS } from './data/items.js';
+import { CLASS_DEFS, SP_PER_LEVEL } from './data/classes.js';
 import { CUBES } from './data/potentials.js';
 import './data/skills.js';
 
@@ -17,7 +18,8 @@ export const ATTR_INFO = {
   luk: 'Luck: +0.2% crit, +0.6% crit damage, +0.6% item rarity and gold',
 };
 export const BAG_SIZE = 60;
-export const ROTATION_SIZE = 3;
+export const ROTATION_SIZE = 3; // grows by one at 3rd and at 4th job
+const SAVE_VERSION = 2;
 
 // Every stat sum gear and passives can add to. Passive skills write into a copy of this.
 const EMPTY_MODS = { atk: 0, matk: 0, hp: 0, def: 0, mres: 0, atkp: 0, matkp: 0, hpp: 0, mpp: 0, crit: 0, critdmg: 0, spd: 0,
@@ -36,7 +38,8 @@ export class Player {
 
   // Accepts any older save; missing fields fall back to defaults.
   static fromJSON(data) {
-    const p = Object.assign(new Player(), data);
+    const { skillPts, ...rest } = data; // v1 stored unspent SP; it is derived from level now
+    const p = Object.assign(new Player(), rest);
     p.alloc = { ...new Player().alloc, ...(data.alloc || {}) };
     p.stats = { ...new Player().stats, ...(data.stats || {}) };
     p.cubes = { ...new Player().cubes, ...(data.cubes || {}) };
@@ -45,19 +48,42 @@ export class Player {
     for (const s of SLOTS) if (data.equip && data.equip[s]) p.equip[s] = Item.fromJSON(data.equip[s]);
     Item.reserveIds([...p.inv, ...Object.values(p.equip)]);
     if (!CharacterClass.get(p.cls)) p.cls = 'novice';
+    if (!(data.v >= 2)) p.#migrateV1();
+    p.v = SAVE_VERSION;
     return p;
   }
 
+  // v1 had 4 AP and 1 SP per level, one shared SP pool, and max rank 5 (Novice) or 10.
+  // v2 has 5 AP per level and per-job SP books with max ranks 10/20/30, so ranks are scaled
+  // to keep the same skill power, and any job that ends up over its book is trimmed back.
+  #migrateV1() {
+    this.statPts += Math.max(0, this.lvl - 1);
+    const tierOf = {};
+    for (const d of Object.values(CLASS_DEFS)) for (const id of d.skills) tierOf[id] = d.tier;
+    const known = new Set(this.knownSkillIds);
+    for (const id in this.skills) {
+      const sk = Skill.get(id);
+      if (!sk || !known.has(id)) { delete this.skills[id]; continue; }
+      this.skills[id] = Math.min(sk.maxRank, Math.round(this.skills[id] * (tierOf[id] === 2 ? 3 : 2)));
+    }
+    for (const c of this.characterClass.lineage) {
+      while (this.spFor(c.tier) < 0) {
+        const id = c.skillIds.filter(x => this.skills[x]).sort((a, b) => this.skills[b] - this.skills[a])[0];
+        if (--this.skills[id] <= 0) delete this.skills[id];
+      }
+    }
+    this.loadout = this.loadout.filter(id => this.skillRank(id)).slice(0, this.rotationSize);
+  }
+
   constructor() {
-    this.v = 1;
+    this.v = SAVE_VERSION;
     this.name = 'Climber';
     this.cls = 'novice';
     this.lvl = 1;
     this.exp = 0;
     this.alloc = { str: 0, dex: 0, int: 0, vit: 0, luk: 0 };
-    this.statPts = 0;
-    this.skills = {};
-    this.skillPts = 0;
+    this.statPts = 0; // AP
+    this.skills = {}; // skill id -> rank; unspent SP is derived per job (spFor)
     this.loadout = ['power_strike'];
     this.equip = {};
     this.inv = [];
@@ -99,7 +125,7 @@ export class Player {
     let ups = 0;
     while (this.exp >= expToLevel(this.lvl)) {
       this.exp -= expToLevel(this.lvl); this.lvl++; ups++;
-      this.statPts += POINTS_PER_LEVEL; this.skillPts += 1;
+      this.statPts += POINTS_PER_LEVEL;
     }
     return ups;
   }
@@ -108,6 +134,19 @@ export class Player {
     n = Math.min(n, this.statPts);
     if (!ATTRS.includes(attr) || n <= 0) return false;
     this.alloc[attr] += n; this.statPts -= n;
+    return true;
+  }
+
+  // MapleStory's Auto-assign: spend all AP in the ratio of the current class's growth.
+  autoAssign() {
+    if (this.statPts <= 0) return false;
+    const w = this.characterClass.growth, keys = Object.keys(w);
+    const total = keys.reduce((s, k) => s + w[k], 0);
+    while (this.statPts > 0) {
+      const spent = keys.reduce((s, k) => s + this.alloc[k], 0) + 1;
+      const k = keys.reduce((best, k) => (w[k] / total - this.alloc[k] / spent > w[best] / total - this.alloc[best] / spent ? k : best));
+      this.allocate(k, 1);
+    }
     return true;
   }
 
@@ -133,27 +172,52 @@ export class Player {
   }
 
   // ---- Skills ----
+  // Each job has its own SP book, filled by the levels that belong to that job (Novice 1-9, 1st job 10-29,
+  // 2nd job 30-59, 3rd job 60-99, 4th job 100+), whether or not you have advanced yet.
   get knownSkillIds() { return this.characterClass.allSkillIds; }
   skillRank(id) { return this.skills[id] || 0; }
+  get rotationSize() { return ROTATION_SIZE + Math.max(0, this.characterClass.tier - 2); }
 
-  learnSkill(id) {
-    const sk = Skill.get(id);
-    if (!sk || !this.knownSkillIds.includes(id)) return false;
-    const r = this.skillRank(id);
-    if (r >= sk.maxRank || this.skillPts < 1) return false;
-    this.skills[id] = r + 1; this.skillPts--;
-    if (sk.isActive && r === 0) this.addToRotation(id);
-    return true;
+  spEarned(tier) {
+    if (tier === 0) return Math.min(this.lvl, 10) * SP_PER_LEVEL[0]; // a new Novice starts with Power Strike at rank 1
+    const from = CharacterClass.unlockLevel(tier), next = CharacterClass.unlockLevel(tier + 1);
+    const levels = Math.max(0, Math.min(this.lvl, next ? next - 1 : Infinity) - from + 1);
+    return levels * SP_PER_LEVEL[tier];
+  }
+  get spEarnedTotal() { return [0, 1, 2, 3, 4].reduce((s, t) => s + this.spEarned(t), 0); }
+  // Unspent SP in one job's book.
+  spFor(tier) {
+    const c = this.characterClass.lineage[tier];
+    const spent = c ? c.skillIds.reduce((s, id) => s + this.skillRank(id), 0) : 0;
+    return this.spEarned(tier) - spent;
+  }
+  // The lineage class that teaches this skill, or undefined.
+  skillClass(id) { return this.characterClass.lineage.find(c => c.skillIds.includes(id)); }
+  // Unspent SP you can actually use: books of jobs you hold that still have a skill below max.
+  get skillPts() {
+    return this.characterClass.lineage.reduce((s, c) =>
+      s + (c.skillIds.some(id => this.skillRank(id) < Skill.get(id).maxRank) ? Math.max(0, this.spFor(c.tier)) : 0), 0);
+  }
+  canLearn(id) {
+    const sk = Skill.get(id), c = this.skillClass(id);
+    return !!(sk && c && this.skillRank(id) < sk.maxRank && this.spFor(c.tier) >= 1);
+  }
+
+  // Spend up to n SP on one skill. Returns how many ranks were learned.
+  learnSkill(id, n = 1) {
+    let learned = 0;
+    while (learned < n && this.canLearn(id)) { this.skills[id] = this.skillRank(id) + 1; learned++; }
+    if (learned && Skill.get(id).isActive && this.skillRank(id) === learned) this.addToRotation(id);
+    return learned;
   }
   resetSkills() {
     if (!this.#payRespec()) return false;
-    for (const k in this.skills) this.skillPts += this.skills[k];
     this.skills = {}; this.loadout = [];
     return true;
   }
 
   addToRotation(id) {
-    if (this.loadout.length >= ROTATION_SIZE || this.loadout.includes(id) || !this.skillRank(id)) return false;
+    if (this.loadout.length >= this.rotationSize || this.loadout.includes(id) || !this.skillRank(id)) return false;
     this.loadout.push(id); return true;
   }
   removeFromRotation(id) { this.loadout = this.loadout.filter(x => x !== id); }
