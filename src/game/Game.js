@@ -5,6 +5,7 @@ import { Item } from './Item.js';
 import { Zone } from './Enemy.js';
 import { CUBES } from './data/potentials.js';
 import { KILLS_PER_FLOOR, POINTS_PER_LEVEL, isBossFloor } from './curves.js';
+import { SET_CHANCE } from './data/sets.js';
 import { rand, randInt, fmt } from './util.js';
 
 export class Game {
@@ -71,7 +72,9 @@ export class Game {
     const drops = [];
     for (let i = 0; i < e.dropCount; i++) if (rand() < e.dropChance) {
       const rar = Item.rollRarity(st.mf, e.rarityBoost);
-      drops.push(Item.generate(Item.levelFor(e.f), e.boss ? Math.max(2, rar) : rar));
+      const r = e.boss ? Math.max(2, rar) : rar;
+      const isSet = rand() < SET_CHANCE[e.boss ? 'boss' : e.elite ? 'elite' : 'normal'];
+      drops.push(isSet ? Item.generateSetPiece(Item.levelFor(e.f), r) : Item.generate(Item.levelFor(e.f), r));
     }
     if (rand() < (e.boss ? 1 : 0.12)) {
       const sh = e.boss ? randInt(5, 10) : 1;
@@ -97,10 +100,10 @@ export class Game {
     p.stats.best = Math.max(p.stats.best, p.maxFloor);
   }
 
-  // Auto-salvage, sell if the bag is full, or put the item in the bag.
+  // Auto-salvage (never a set piece), sell if the bag is full, or put the item in the bag.
   #stash(it, battle) {
     const p = this.player;
-    if (p.autoSalvage && it.rar < p.autoSalvage) {
+    if (p.autoSalvage && it.rar < p.autoSalvage && !it.set) {
       p.shards += it.salvageValue;
       this.log('salv', `Auto-salvaged ${it.name} (+${it.salvageValue} shards).`);
     } else if (p.bagFull) {

@@ -81,6 +81,7 @@ export class GearPanel extends Panel {
     return `<div class="detail"><h3>${ItemView.title(it)}</h3>
       ${ItemView.weaponNote(it)}
       ${ItemView.properties(it)}
+      ${ItemView.setInfo(p, it)}
       ${ItemView.comparison(p, it)}
       ${ItemView.starForcePanel(p, it, this.safeguard)}
       ${ItemView.cubePanel(p, it)}

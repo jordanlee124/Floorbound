@@ -2,6 +2,7 @@
 import { Component } from './Component.js';
 import { $ } from './dom.js';
 import { ItemView } from './ItemView.js';
+import { RARITIES } from '../game/index.js';
 
 export class LootPopup extends Component {
   queue = []; // item ids, oldest first
@@ -14,10 +15,10 @@ export class LootPopup extends Component {
     };
   }
 
-  // Queue the drops worth showing.
+  // Queue the drops worth showing. Set pieces always show unless popups are off.
   offer(items) {
     const min = this.player.lootPopupMin;
-    for (const it of items) if (it.rar >= min) this.queue.push(it.id);
+    for (const it of items) if (it.rar >= min || (it.set && min < RARITIES.length)) this.queue.push(it.id);
     this.render();
   }
 
@@ -37,6 +38,7 @@ export class LootPopup extends Component {
       <h3>${ItemView.title(it)}</h3>
       ${ItemView.weaponNote(it)}
       ${ItemView.properties(it)}
+      ${ItemView.setInfo(p, it)}
       ${ItemView.comparison(p, it)}
       <div class="row"><button class="pri" data-act="loot-equip" data-id="${it.id}">Equip</button>
         <button data-act="loot-keep">Keep in bag</button>

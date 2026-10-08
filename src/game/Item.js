@@ -1,11 +1,13 @@
 // A piece of equipment. Plain fields are the save format:
 // id, slot, ilvl, rar (potential tier), stars, base, pot ([{ k, t }] lines), lock, wtype, name,
 // broken (destroyed by Star Force, waiting for repair), boomStreak (failures in a row that lost a star),
-// pity ({ red, black }: cubes used at the current tier), pending (a Black Cube result waiting for a choice).
+// pity ({ red, black }: cubes used at the current tier), pending (a Black Cube result waiting for a choice),
+// set (an item set id, for set pieces).
 import { gearPower } from './curves.js';
 import { rand, pick } from './util.js';
 import { SLOTS, RARITIES, WEAPONS, ITEM_NAMES, MATERIALS, STAR_STATS, BRACKET, BRACKET_POWER_OFFSET } from './data/items.js';
 import { POTENTIALS, POTENTIAL_LINES, CUBES } from './data/potentials.js';
+import { SETS } from './data/sets.js';
 import {
   STAR_SUCCESS, STAR_DESTROY, STAR_SAFE_FLOORS, STAR_DROP_FROM, CHANCE_TIME_AFTER, SAFEGUARD_FROM, SAFEGUARD_TO,
   SAFEGUARD_COST_MUL, DESTROYED_STARS, REPAIR_COST_MUL, MAX_STARS, starMultiplier, starCostFactor,
@@ -87,7 +89,17 @@ export class Item {
     return it;
   }
 
+  // A piece of a random set: the slot and weapon type come from the set, and the set name replaces the material.
+  static generateSetPiece(ilvl, rarityIdx, setId = pick(Object.keys(SETS))) {
+    const set = SETS[setId], slot = pick(set.slots);
+    const it = Item.generate(ilvl, rarityIdx, slot, slot === 'weapon' ? pick(set.weapons) : undefined);
+    it.set = setId;
+    it.name = `${set.name} ${it.name.split(' ').slice(1).join(' ')}`;
+    return it;
+  }
+
   get rarity() { return RARITIES[this.rar]; }
+  get setDef() { return this.set ? SETS[this.set] : null; }
   get weapon() { return this.wtype ? WEAPONS[this.wtype] : null; }
   get displayName() { return this.stars ? `${this.name} ★${this.stars}` : this.name; }
   // The floor this item's stats are worth.

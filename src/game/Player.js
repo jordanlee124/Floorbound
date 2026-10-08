@@ -7,6 +7,7 @@ import { clamp } from './util.js';
 import { SLOTS, WEAPONS } from './data/items.js';
 import { CLASS_DEFS, SP_PER_LEVEL } from './data/classes.js';
 import { CUBES } from './data/potentials.js';
+import { SETS } from './data/sets.js';
 import './data/skills.js';
 
 export const ATTRS = ['str', 'dex', 'int', 'vit', 'luk'];
@@ -291,6 +292,17 @@ export class Player {
     return { ok: true, item: it, ...it.rollCube(type) };
   }
 
+  // Item sets worn: [{ id, set, count, active: [n, ...] }], where active lists the piece counts whose bonuses are on.
+  // A destroyed piece does not count.
+  activeSets(equip = this.equip) {
+    const counts = {};
+    for (const sl of SLOTS) { const it = equip[sl]; if (it && it.set && !it.broken) counts[it.set] = (counts[it.set] || 0) + 1; }
+    return Object.entries(counts).map(([id, count]) => {
+      const set = SETS[id];
+      return { id, set, count, active: Object.keys(set.bonus).map(Number).filter(n => n <= count) };
+    });
+  }
+
   // ---- Combat stats ----
   // floor: defense and evasion are measured against the floor you fight on.
   // equipOverride: preview stats with different gear without changing anything.
@@ -302,6 +314,7 @@ export class Player {
       const r = this.skillRank(id); const sk = Skill.get(id);
       if (r && !sk.isActive) sk.apply(g, r);
     }
+    for (const s of this.activeSets(eq)) for (const n of s.active) { const b = s.set.bonus[n]; for (const k in b) g[k] += b[k]; }
     const a = this.attributes;
     for (const k of ATTRS) a[k] = (a[k] + g[k]) * (1 + g.allstat / 100);
     const c = this.characterClass;

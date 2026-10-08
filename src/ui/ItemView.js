@@ -5,6 +5,9 @@ import { esc, rarityClass } from './dom.js';
 const STAT_LABEL = { atk: 'Attack', matk: 'Magic', hp: 'HP', def: 'Defense', mres: 'Magic Resist', crit: '% Crit', critdmg: '% Crit Damage', spd: '% Speed', mp: 'MP', acc: 'Accuracy', eva: 'Evasion' };
 const PERCENT_BASE = ['crit', 'critdmg', 'spd'];
 const pct = x => `${Math.round(x * 1000) / 10}%`;
+const SET_LABEL = { atkp: '% Attack', matkp: '% Magic', hpp: '% HP', mpp: '% MP', defp: '% Defense', ls: '% Lifesteal', crit: '% Crit',
+  critdmg: '% Crit damage', spellCrit: '% Spell crit', pen: '% Armor pen', dmg: '% Damage', boss: '% Boss damage', mf: '% Item rarity', gf: '% Gold find' };
+const setBonusText = b => Object.entries(b).map(([k, v]) => k === 'weaken' ? `Enemies deal ${Math.round(v * 100)}% less damage` : `+${v}${SET_LABEL[k] || ' ' + k}`).join(', ');
 
 // [label, read value from combat stats, shown as percent points?]
 const COMPARE_ROWS = [
@@ -52,6 +55,18 @@ export class ItemView {
     const pot = it.rar ? `<li class="pot-head">Potential: <span class="r${it.rar}">${RARITIES[it.rar].name}</span></li>${ItemView.lines(it.lines)}` : '<li class="pot-head">No potential. A cube reveals Rare lines.</li>';
     const broken = it.broken ? '<li class="broken">Destroyed by Star Force: gives no stats until repaired.</li>' : '';
     return `${ItemView.stars(it)}<ul class="props">${broken}${base.join('')}${pot}</ul>`;
+  }
+
+  // Set name, how many pieces you would wear with this item on, and every bonus tier (lit when active).
+  static setInfo(player, it) {
+    const set = it.setDef;
+    if (!set) return '';
+    const worn = player.activeSets({ ...player.equip, [it.slot]: it }).find(s => s.id === it.set);
+    const count = worn ? worn.count : 0;
+    const tiers = Object.entries(set.bonus).map(([n, b]) =>
+      `<li class="${count >= n ? 'on' : 'muted'}">(${n}) ${setBonusText(b)}</li>`).join('');
+    return `<div class="setinfo"><b>${set.name} set</b> <small class="muted">${count} / ${set.slots.length} worn${player.isEquipped(it) ? '' : ' with this item'}</small>
+      <ul class="props">${tiers}</ul></div>`;
   }
 
   // How the player's combat stats would change if they equipped this item.
