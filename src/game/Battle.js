@@ -8,26 +8,27 @@ export const TICK = 0.1; // seconds
 const STALEMATE_AT = 180; // seconds; a fight this long counts as a loss
 
 // What a skill can do when it fires. Passed to ActiveSkill.cast().
+// boost multiplies the skill's damage (hits, damage over time and minions); it comes from 5th job boosts.
 class SkillContext {
-  constructor(battle, skillName) { this.battle = battle; this.label = skillName; }
+  constructor(battle, skillName, boost = 1) { this.battle = battle; this.label = skillName; this.boost = boost; }
   get stats() { return this.battle.stats; }
   hit(mult, type, opts) {
     const b = this.battle;
     const base = type === 'magic' ? b.stats.matk * b.buffProduct('matkMul') : b.stats.atk * b.attackMultiplier;
-    return b.playerHit(base * mult, type, { label: this.label, ...opts });
+    return b.playerHit(base * mult * this.boost, type, { label: this.label, ...opts });
   }
-  hitRaw(raw, type, opts) { return this.battle.playerHit(raw * this.battle.attackMultiplier, type, { label: this.label, ...opts }); }
+  hitRaw(raw, type, opts) { return this.battle.playerHit(raw * this.boost * this.battle.attackMultiplier, type, { label: this.label, ...opts }); }
   buff(id, duration, mods) { this.battle.buffs[id] = { t: duration, name: this.label, ...mods }; this.battle.log('skill', `${this.label}!`); }
   dot(name, dps, duration, type) {
     const b = this.battle;
-    b.addDot(name, dps * b.damageMultiplier, duration, type);
+    b.addDot(name, dps * this.boost * b.damageMultiplier, duration, type);
     b.log('skill', `${this.label}: ${b.enemy.name} is afflicted.`);
   }
   shield(amount, duration) { const b = this.battle; b.shield = amount; b.shieldT = duration; b.log('skill', `${this.label}: shield ${fmt(amount)}.`); }
   stun(duration) { this.battle.stun = Math.max(this.battle.stun, duration); }
   slow(fraction, duration) { this.battle.slow = fraction; this.battle.slowT = duration; }
   heal(amount) { const b = this.battle; b.hp = Math.min(b.stats.hp, b.hp + amount); }
-  minion(dmg, duration, text = 'a skeleton rises') { this.battle.minion = { name: this.label, dmg, t: duration, acc: 0 }; this.battle.log('skill', `${this.label}: ${text}.`); }
+  minion(dmg, duration, text = 'a skeleton rises') { this.battle.minion = { name: this.label, dmg: dmg * this.boost, t: duration, acc: 0 }; this.battle.log('skill', `${this.label}: ${text}.`); }
 }
 
 export class Battle {
@@ -123,8 +124,9 @@ export class Battle {
       if ((this.cooldowns[id] || 0) > 0) continue;
       const cost = sk.manaCost(r);
       if (this.mp < cost) continue;
-      this.mp -= cost; this.cooldowns[id] = sk.cooldown;
-      sk.cast(new SkillContext(this, sk.name), r);
+      const st = this.stats;
+      this.mp -= cost; this.cooldowns[id] = sk.cooldown * (1 - (st.skillCd[id] || 0) / 100);
+      sk.cast(new SkillContext(this, sk.name, 1 + (st.skillDmg[id] || 0) / 100), r);
       return;
     }
     if (this.stats.basic === 'magic') this.playerHit(this.stats.matk * this.buffProduct('matkMul'), 'magic', { label: 'Your bolt hits' });

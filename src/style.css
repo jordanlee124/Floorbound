@@ -145,6 +145,7 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); g
 .skills .row { justify-content: flex-end; }
 .tag { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; padding: 1px 5px; border-radius: 3px; background: var(--panel2); color: var(--dim); }
 .tag.active { color: var(--ember); }
+.tag.boost { color: var(--gold); }
 .classes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-block: 8px; }
 .cls { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); align-content: start; }
 .cls h3 { font: 700 24px/1 var(--display); color: var(--ember); }

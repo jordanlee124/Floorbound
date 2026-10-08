@@ -18,7 +18,7 @@ export const ATTR_INFO = {
   luk: 'Luck: +0.2% crit, +0.6% crit damage, +0.6% item rarity and gold',
 };
 export const BAG_SIZE = 60;
-export const ROTATION_SIZE = 3; // grows by one at 3rd and at 4th job
+export const ROTATION_SIZE = 3; // grows by one at 3rd, 4th and 5th job
 const SAVE_VERSION = 2;
 
 // Every stat sum gear and passives can add to. Passive skills write into a copy of this.
@@ -173,7 +173,7 @@ export class Player {
 
   // ---- Skills ----
   // Each job has its own SP book, filled by the levels that belong to that job (Novice 1-9, 1st job 10-29,
-  // 2nd job 30-59, 3rd job 60-99, 4th job 100+), whether or not you have advanced yet.
+  // 2nd job 30-59, 3rd job 60-99, 4th job 100-199, 5th job 200+), whether or not you have advanced yet.
   get knownSkillIds() { return this.characterClass.allSkillIds; }
   skillRank(id) { return this.skills[id] || 0; }
   get rotationSize() { return ROTATION_SIZE + Math.max(0, this.characterClass.tier - 2); }
@@ -184,7 +184,7 @@ export class Player {
     const levels = Math.max(0, Math.min(this.lvl, next ? next - 1 : Infinity) - from + 1);
     return levels * SP_PER_LEVEL[tier];
   }
-  get spEarnedTotal() { return [0, 1, 2, 3, 4].reduce((s, t) => s + this.spEarned(t), 0); }
+  get spEarnedTotal() { return SP_PER_LEVEL.reduce((s, _, t) => s + this.spEarned(t), 0); }
   // Unspent SP in one job's book.
   spFor(tier) {
     const c = this.characterClass.lineage[tier];
@@ -296,7 +296,7 @@ export class Player {
   // equipOverride: preview stats with different gear without changing anything.
   combatStats(floor = this.floor, equipOverride = null) {
     const eq = equipOverride || this.equip;
-    const g = { ...EMPTY_MODS };
+    const g = { ...EMPTY_MODS, skillDmg: {}, skillCd: {} }; // skillDmg/skillCd: 5th job boosts, skill id -> percent
     for (const sl of SLOTS) { const it = eq[sl]; if (!it) continue; const is = it.stats; for (const k in is) g[k] = (g[k] || 0) + is[k]; }
     for (const id of this.knownSkillIds) {
       const r = this.skillRank(id); const sk = Skill.get(id);
@@ -325,6 +325,7 @@ export class Player {
     const eva = a.dex * 1 + g.eva;
     st.dodge = clamp(eva / (eva + 150 + 10 * floor), 0, 0.35) + g.dodgeFlat;
     st.dmg = g.dmg; st.boss = g.boss;
+    st.skillDmg = g.skillDmg; st.skillCd = g.skillCd;
     st.ls = g.ls; st.pen = Math.min(80, g.pen);
     st.mf = a.luk * 0.6 + g.mf; st.gf = a.luk * 0.6 + g.gf;
     st.hpRegen = g.hpRegen; st.frenzy = g.frenzy; st.reflect = g.reflect; st.execute = g.execute;
