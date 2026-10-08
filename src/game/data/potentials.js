@@ -2,20 +2,21 @@
 // percent lines have fixed values per tier, flat lines also scale with item level.
 import { gearPower as S } from '../curves.js';
 
-const ALL = ['weapon', 'helm', 'armor', 'gloves', 'boots', 'ring', 'amulet'];
+const ALL = ['weapon', 'subweapon', 'helm', 'armor', 'gloves', 'boots', 'ring', 'amulet'];
+const WEAPONS = ['weapon', 'subweapon']; // sub weapons roll weapon lines, as in MapleStory
 const ARMOR = ['helm', 'armor', 'gloves', 'boots'];
 const ACCESSORY = ['ring', 'amulet'];
 const flatAttr = (t, l) => Math.round((2 + 0.4 * l) * (t + 1) / 5);
 
 // value(tier, ilvl). slots: where the line can roll.
 export const POTENTIALS = {
-  atkp: { name: '% Attack', percent: true, slots: ['weapon'], value: t => [1, 3, 6, 9, 12][t] },
-  matkp: { name: '% Magic', percent: true, slots: ['weapon'], value: t => [1, 3, 6, 9, 12][t] },
-  dmg: { name: '% Damage', percent: true, slots: ['weapon'], value: t => [1, 3, 6, 9, 12][t] },
-  boss: { name: '% Boss Damage', percent: true, slots: ['weapon'], value: t => [0, 0, 10, 20, 30][t], minTier: 2 },
-  pen: { name: '% Armor Pen', percent: true, slots: ['weapon'], value: t => [1, 3, 5, 10, 15][t] },
+  atkp: { name: '% Attack', percent: true, slots: WEAPONS, value: t => [1, 3, 6, 9, 12][t] },
+  matkp: { name: '% Magic', percent: true, slots: WEAPONS, value: t => [1, 3, 6, 9, 12][t] },
+  dmg: { name: '% Damage', percent: true, slots: WEAPONS, value: t => [1, 3, 6, 9, 12][t] },
+  boss: { name: '% Boss Damage', percent: true, slots: WEAPONS, value: t => [0, 0, 10, 20, 30][t], minTier: 2 },
+  pen: { name: '% Armor Pen', percent: true, slots: WEAPONS, value: t => [1, 3, 5, 10, 15][t] },
   critdmg: { name: '% Crit Damage', percent: true, slots: ['gloves'], value: t => [0, 0, 8, 12, 16][t], minTier: 2 },
-  crit: { name: '% Crit', percent: true, slots: ['weapon', 'gloves', 'helm', ...ACCESSORY], value: t => [1, 2, 4, 6, 8][t] },
+  crit: { name: '% Crit', percent: true, slots: [...WEAPONS, 'gloves', 'helm', ...ACCESSORY], value: t => [1, 2, 4, 6, 8][t] },
   allstat: { name: '% All Stats', percent: true, slots: [...ARMOR, ...ACCESSORY], value: t => [1, 2, 4, 6, 9][t] },
   hpp: { name: '% HP', percent: true, slots: [...ARMOR, 'amulet'], value: t => [1, 3, 6, 9, 12][t] },
   spd: { name: '% Speed', percent: true, slots: ['boots', 'gloves'], value: t => [1, 2, 4, 6, 8][t] },

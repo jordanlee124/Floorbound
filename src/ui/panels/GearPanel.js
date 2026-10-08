@@ -1,7 +1,8 @@
 // Equipped gear, the selected item's details, Star Force and cubes, and the bag.
 import { Panel } from './Panel.js';
 import { ItemView } from '../ItemView.js';
-import { SLOTS, SLOT_NAME, RARITIES, BAG_SIZE, fmt } from '../../game/index.js';
+import { esc } from '../dom.js';
+import { SLOTS, SLOT_NAME, TYPE_NAME, RARITIES, BAG_SIZE, fmt } from '../../game/index.js';
 
 const AUTO_SALVAGE = ['Off', 'Normal', 'Rare and below', 'Epic and below'];
 // Index = minimum rarity shown; RARITIES.length = never.
@@ -16,7 +17,7 @@ export class GearPanel extends Panel {
     const p = this.player, log = this.game.log;
     return {
       select: ({ id }) => { this.selectedId = id; },
-      equip: ({ id }) => p.equipItem(id),
+      equip: ({ id, slot }) => p.equipItem(id, slot),
       unequip: ({ slot }) => p.unequip(slot),
       salvage: ({ id }) => { const v = p.salvage(id); if (v) { log('salv', `Salvaged for ${v} shards.`); this.selectedId = null; } },
       sell: ({ id }) => { const v = p.sell(id); if (v) { log('salv', `Sold for ${fmt(v)} gold.`); this.selectedId = null; } },
@@ -55,9 +56,9 @@ export class GearPanel extends Panel {
         <small>${SLOT_NAME[s]}</small>${it ? ItemView.title(it, true) : '<span class="muted">Empty</span>'}</button>`;
     }).join('');
     const bag = p.inv.slice().sort((a, b) => b.rar - a.rar || b.ilvl - a.ilvl).map(it => {
-      const cur = p.equip[it.slot];
+      const cur = p.equip[ItemView.compareSlot(p, it)];
       return `<button class="inv ${it === sel ? 'sel' : ''}" data-act="select" data-id="${it.id}">${it.lock ? '<i class="lock" title="Locked">L</i>' : ''}
-        ${ItemView.title(it, true)}<small>${SLOT_NAME[it.slot]} · Lv ${it.ilvl}${!p.canEquip(it) ? ` · <b class="down">${it.jobDef.name} only</b>` : cur && it.ilvl > cur.ilvl ? ' · <b class="up">newer</b>' : ''}</small></button>`;
+        ${ItemView.title(it, true)}<small>${TYPE_NAME[it.slot]} · Lv ${it.ilvl}${!p.canEquip(it) ? ` · <b class="down">${it.jobDef.name} only</b>` : cur && it.ilvl > cur.ilvl ? ' · <b class="up">newer</b>' : ''}</small></button>`;
     }).join('');
     const options = (labels, value) => labels.map((n, i) => `<option value="${i}" ${value === i ? 'selected' : ''}>${n}</option>`).join('');
     return `<div class="gear"><section><h2>Equipped</h2><div class="slots">${slots}</div></section>
@@ -73,9 +74,13 @@ export class GearPanel extends Panel {
 
   #detail(it) {
     const p = this.player;
+    // A ring with every ring slot full (and no ring of its kind worn) needs a choice of which ring to replace.
+    const equip = !p.canEquip(it) || p.equipTarget(it)
+      ? `<button class="pri" data-act="equip" data-id="${it.id}" ${p.canEquip(it) ? '' : 'disabled'}>Equip</button>`
+      : p.slotsFor(it).filter(s => p.canEquipAt(it, s)).map(s => `<button class="pri" data-act="equip" data-id="${it.id}" data-slot="${s}">Replace ${esc(p.equip[s].name)}</button>`).join('');
     const actions = p.isEquipped(it)
-      ? `<button data-act="unequip" data-slot="${it.slot}">Unequip</button>`
-      : `<button class="pri" data-act="equip" data-id="${it.id}" ${p.canEquip(it) ? '' : 'disabled'}>Equip</button>
+      ? `<button data-act="unequip" data-slot="${p.equippedAt(it)}">Unequip</button>`
+      : `${equip}
          <button data-act="salvage" data-id="${it.id}" ${it.lock ? 'disabled' : ''}>Salvage (+${it.salvageValue} shards)</button>
          <button data-act="sell" data-id="${it.id}" ${it.lock ? 'disabled' : ''}>Sell (${fmt(it.sellValue)} gold)</button>`;
     return `<div class="detail"><h3>${ItemView.title(it)}</h3>

@@ -1,5 +1,5 @@
 // How items and stat comparisons are shown. Used by the Gear panel and the loot popup.
-import { POTENTIALS, RARITIES, SLOT_NAME, STAR_STATS, CUBES, LEGENDARY, SAFEGUARD_COST_MUL, Item, fmt } from '../game/index.js';
+import { POTENTIALS, RARITIES, SLOT_NAME, TYPE_NAME, RINGS, STAR_STATS, CUBES, LEGENDARY, SAFEGUARD_COST_MUL, Item, fmt } from '../game/index.js';
 import { esc, rarityClass } from './dom.js';
 
 const STAT_LABEL = { str: 'STR', dex: 'DEX', int: 'INT', vit: 'VIT', luk: 'LUK', atk: 'Attack', matk: 'Magic', hp: 'HP', def: 'Defense', mres: 'Magic Resist', crit: '% Crit', critdmg: '% Crit Damage', spd: '% Speed', mp: 'MP', acc: 'Accuracy', eva: 'Evasion' };
@@ -27,7 +27,7 @@ export class ItemView {
 
   // Name in potential-tier colour; the long form adds tier, slot and item level.
   static title(it, short = false) {
-    const meta = short ? '' : `<small>${RARITIES[it.rar].name} ${SLOT_NAME[it.slot]} · Lv ${it.ilvl} · ${it.jobDef ? it.jobDef.name : 'Any class'}</small>`;
+    const meta = short ? '' : `<small>${RARITIES[it.rar].name} ${TYPE_NAME[it.slot]} · Lv ${it.ilvl} · ${it.jobDef ? it.jobDef.name : 'Any class'}</small>`;
     return `<span class="iname ${rarityClass(it.rar)}">${esc(it.displayName)}</span>${meta}`;
   }
 
@@ -53,15 +53,17 @@ export class ItemView {
     const base = Object.keys(it.base).map(k =>
       `<li>${ItemView.statLine(k, it.broken ? 0 : st[k] - it.lines.filter(l => l.k === k).reduce((a, l) => a + l.value, 0))}${it.stars && STAR_STATS.includes(k) ? ' <small class="muted">(★)</small>' : ''}</li>`);
     const pot = it.rar ? `<li class="pot-head">Potential: <span class="r${it.rar}">${RARITIES[it.rar].name}</span></li>${ItemView.lines(it.lines)}` : '<li class="pot-head">No potential. A cube reveals Rare lines.</li>';
+    const ring = it.ringKind ? `<li class="pot-head">${RINGS[it.ringKind].name}: one per character</li>` : '';
     const broken = it.broken ? '<li class="broken">Destroyed by Star Force: gives no stats until repaired.</li>' : '';
-    return `${ItemView.stars(it)}<ul class="props">${broken}${base.join('')}${pot}</ul>`;
+    return `${ItemView.stars(it)}<ul class="props">${ring}${broken}${base.join('')}${pot}</ul>`;
   }
 
   // Set name, how many pieces you would wear with this item on, and every bonus tier (lit when active).
   static setInfo(player, it) {
     const set = it.setDef;
     if (!set) return '';
-    const worn = player.activeSets({ ...player.equip, [it.slot]: it }).find(s => s.id === it.set);
+    const at = player.equippedAt(it) || ItemView.compareSlot(player, it);
+    const worn = player.activeSets({ ...player.equip, [at]: it }).find(s => s.id === it.set);
     const count = worn ? worn.count : 0;
     const tiers = Object.entries(set.bonus).map(([n, b]) =>
       `<li class="${count >= n ? 'on' : 'muted'}">(${n}) ${setBonusText(b)}</li>`).join('');
@@ -69,12 +71,16 @@ export class ItemView {
       <ul class="props">${tiers}</ul></div>`;
   }
 
+  // The equip slot an item is compared against: where Equip would put it, else the first slot of its type.
+  static compareSlot(player, it) { return player.equipTarget(it) || player.slotsFor(it)[0]; }
+
   // How the player's combat stats would change if they equipped this item.
   static comparison(player, it) {
     if (player.isEquipped(it)) return '<p class="muted">Equipped.</p>';
     if (!player.canEquip(it)) return `<p class="warn">${it.jobDef.name} gear: your class can't equip it. Salvage or sell it.</p>`;
     const cur = player.combatStats();
-    const next = player.combatStats(player.floor, { ...player.equip, [it.slot]: it });
+    const at = ItemView.compareSlot(player, it);
+    const next = player.combatStats(player.floor, { ...player.equip, [at]: it });
     const rows = COMPARE_ROWS.map(([label, read, points]) => {
       const d = read(next) - read(cur);
       if (Math.abs(d) < (points ? 0.05 : 0.5)) return '';
@@ -83,8 +89,9 @@ export class ItemView {
     }).join('');
     const warn = cur.basic !== next.basic
       ? `<p class="warn">Basic attacks become ${next.basic === 'magic' ? 'magic (scale with Magic)' : 'physical (scale with Attack)'}.</p>` : '';
-    const against = player.equip[it.slot] ? 'current ' + SLOT_NAME[it.slot].toLowerCase() : 'empty slot';
-    return `<p class="muted">If equipped, vs. ${against}:</p><ul class="cmp">${rows || '<li><span>No change</span></li>'}</ul>${warn}`;
+    const against = player.equip[at] ? `${SLOT_NAME[at].toLowerCase()} (${esc(player.equip[at].name)})` : `empty ${SLOT_NAME[at].toLowerCase()}`;
+    const choose = player.equipTarget(it) ? '' : '<p class="muted">All four ring slots are full. Pick which ring to replace below.</p>';
+    return `${choose}<p class="muted">If equipped, vs. ${against}:</p><ul class="cmp">${rows || '<li><span>No change</span></li>'}</ul>${warn}`;
   }
 
   static starForcePanel(player, it, safeguard) {

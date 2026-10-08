@@ -46,6 +46,17 @@ class Bot {
     return game.newBattle();
   }
 
+  // The best slot for an item and the score with it there (rings: any ring slot that keeps ring kinds unique).
+  bestSlot(p, it, eq) {
+    let best = null, bs = -1;
+    for (const sl of p.slotsFor(it)) {
+      if (!p.canEquipAt(it, sl, eq)) continue;
+      const sc = this.score(p, { ...eq, [sl]: it });
+      if (sc > bs) { bs = sc; best = sl; }
+    }
+    return [best, bs];
+  }
+
   score(p, equip) {
     const st = p.combatStats(p.floor, equip), kind = this.build.kind;
     const off = (kind === 'magic' ? st.matk : st.atk) * (st.spd / 100) * (1 + st.crit / 100 * (st.critdmg - 100) / 100) * ((kind === 'magic') === (st.basic === 'magic') ? 1 : 0.6);
@@ -75,23 +86,22 @@ class Bot {
     const classActives = actives.filter(x => x !== 'power_strike');
     p.loadout = (classActives.length >= 2 ? classActives : actives).slice(0, p.rotationSize);
     for (const it of p.inv.slice()) {
-      if (!p.canEquip(it)) continue;
-      const eq = { ...p.equip, [it.slot]: it };
-      if (this.score(p, eq) > this.score(p, p.equip) * 1.001) p.equipItem(it.id);
+      const [slot, sc] = this.bestSlot(p, it, p.equip);
+      if (slot && sc > this.score(p, p.equip) * 1.001) p.equipItem(it.id, slot);
     }
     // Sets: try the best piece of one set in every slot it covers, and keep the swap if the whole outfit scores higher.
     const pool = [...p.inv, ...SLOTS.map(sl => p.equip[sl])].filter(it => it && it.set && p.canEquip(it));
     for (const setId of new Set(pool.map(it => it.set))) {
       const eq = { ...p.equip };
-      for (const it of pool.filter(x => x.set === setId)) {
-        const cur = eq[it.slot];
-        if (!cur || cur.set !== setId || this.score(p, { ...eq, [it.slot]: it }) > this.score(p, eq)) eq[it.slot] = it;
+      for (const it of pool.filter(x => x.set === setId && !Object.values(eq).includes(x))) {
+        const slot = p.slotsFor(it).filter(sl => p.canEquipAt(it, sl, eq)).sort((a, b) => (eq[a] && eq[a].set === setId) - (eq[b] && eq[b].set === setId))[0];
+        if (slot && (!eq[slot] || eq[slot].set !== setId || this.score(p, { ...eq, [slot]: it }) > this.score(p, eq))) eq[slot] = it;
       }
-      if (this.score(p, eq) > this.score(p, p.equip) * 1.001) for (const sl of SLOTS) if (eq[sl] && eq[sl] !== p.equip[sl]) p.equipItem(eq[sl].id);
+      if (this.score(p, eq) > this.score(p, p.equip) * 1.001) for (const sl of SLOTS) if (eq[sl] && eq[sl] !== p.equip[sl]) p.equipItem(eq[sl].id, sl);
     }
     // Keep the best bag piece per set and slot for later; salvage everything else.
     const keep = {};
-    for (const it of p.inv) if (it.set && p.canEquip(it)) { const k = it.set + it.slot, c = keep[k]; if (!c || it.ilvl * 10 + it.rar > c.ilvl * 10 + c.rar) keep[k] = it; }
+    for (const it of p.inv) if (it.set && p.canEquip(it)) { const k = it.set + it.slot + (it.ringKind || ''), c = keep[k]; if (!c || it.ilvl * 10 + it.rar > c.ilvl * 10 + c.rar) keep[k] = it; }
     const kept = new Set(Object.values(keep));
     for (const it of p.inv.slice()) if (!kept.has(it)) p.salvage(it.id);
     const equipped = () => SLOTS.map(s => p.equip[s]).filter(Boolean);

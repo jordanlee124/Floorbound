@@ -2,10 +2,11 @@
 // id, slot, ilvl, rar (potential tier), stars, base, pot ([{ k, t }] lines), lock, wtype, name,
 // broken (destroyed by Star Force, waiting for repair), boomStreak (failures in a row that lost a star),
 // pity ({ red, black }: cubes used at the current tier), pending (a Black Cube result waiting for a choice),
-// set (an item set id, for set pieces), job (warrior/rogue/mage for class gear, absent for common gear).
+// set (an item set id, for set pieces), job (warrior/rogue/mage for class gear, absent for common gear),
+// ringKind (for rings: only one of each kind can be worn).
 import { gearPower } from './curves.js';
 import { rand, pick } from './util.js';
-import { SLOTS, RARITIES, WEAPONS, ITEM_NAMES, MATERIALS, STAR_STATS, BRACKET, BRACKET_POWER_OFFSET, JOBS, JOB_ARMOR_SLOTS, CLASS_ARMOR_CHANCE, OWN_JOB_CHANCE } from './data/items.js';
+import { ITEM_TYPES, DROP_TYPES, RINGS, RARITIES, WEAPONS, ITEM_NAMES, MATERIALS, STAR_STATS, BRACKET, BRACKET_POWER_OFFSET, JOBS, JOB_ARMOR_SLOTS, CLASS_ARMOR_CHANCE, OWN_JOB_CHANCE } from './data/items.js';
 import { POTENTIALS, POTENTIAL_LINES, CUBES } from './data/potentials.js';
 import { SETS, DROP_SETS } from './data/sets.js';
 import {
@@ -28,6 +29,7 @@ export class Item {
     if (it.stars === undefined) it.stars = Math.min(it.enh || 0, it.maxStars);
     if (!it.pot) it.pot = Item.rollLines(it.slot, it.rar, CUBES.red);
     if (!it.pity) it.pity = { red: 0, black: 0 };
+    if (it.slot === 'ring' && !it.ringKind) it.ringKind = { Band: 'band', Signet: 'signet' }[it.name.split(' ').pop()] || 'ring'; // older rings
     delete it.enh; delete it.aff;
     return it;
   }
@@ -58,16 +60,18 @@ export class Item {
 
   // A random drop. Weapons and most armor are class gear, usually for playerJob (the dropper's job branch, or null).
   static generateDrop(ilvl, rarityIdx, playerJob) {
-    const slot = pick(SLOTS);
-    if (slot !== 'weapon' && !(JOB_ARMOR_SLOTS.includes(slot) && rand() < CLASS_ARMOR_CHANCE)) return Item.generate(ilvl, rarityIdx, slot);
+    const slot = pick(DROP_TYPES);
+    const classed = slot === 'weapon' || slot === 'subweapon' || (JOB_ARMOR_SLOTS.includes(slot) && rand() < CLASS_ARMOR_CHANCE);
+    if (!classed) return Item.generate(ilvl, rarityIdx, slot);
     const job = playerJob && rand() < OWN_JOB_CHANCE ? playerJob : pick(Object.keys(JOBS));
     const wtype = slot === 'weapon' ? pick(Object.keys(WEAPONS).filter(w => WEAPONS[w].job === job)) : undefined;
     return Item.generate(ilvl, rarityIdx, slot, wtype, job);
   }
 
-  // job: makes helm/armor/gloves/boots class armor. A weapon's job always comes from its type.
+  // job: makes helm/armor/gloves/boots class armor and picks the sub weapon (any job if not given).
+  // A weapon's job always comes from its type.
   static generate(ilvl, rarityIdx, slot, weaponType, job) {
-    slot = slot || pick(SLOTS);
+    slot = slot || pick(ITEM_TYPES);
     const it = Object.assign(new Item(), {
       id: ++Item.#nextId, slot, ilvl, rar: rarityIdx, stars: 0, base: {}, pot: [], lock: false, pity: { red: 0, black: 0 },
     });
@@ -87,14 +91,27 @@ export class Item {
       if (w.acc) b.acc = w.acc + pl;
       it.name = `${material} ${type}`;
       it.job = w.job;
+    } else if (slot === 'subweapon') {
+      const J = JOBS[job || pick(Object.keys(JOBS))];
+      it.job = Object.keys(JOBS).find(k => JOBS[k] === J);
+      if (it.job === 'warrior') { b.def = lin * 0.8; b.hp = 12 * s; b.atk = 1 * s; }
+      if (it.job === 'rogue') { b.atk = 2 * s; b.crit = 2; }
+      if (it.job === 'mage') { b.matk = 2 * s; b.mp = 10 + pl; }
+      b[J.main] = Math.round(2 + 0.2 * pl);
+      it.name = `${material} ${J.subweapon}`;
     } else {
       if (slot === 'helm') { b.hp = 25 * s; b.mres = lin * 1.2; }
       if (slot === 'armor') { b.hp = 45 * s; b.def = lin * 1.6; b.mres = lin * 0.4; }
       if (slot === 'gloves') { b.atk = 3 * s; b.matk = 3 * s; b.def = lin * 0.4; }
       if (slot === 'boots') { b.spd = 4; b.def = lin * 0.6; b.eva = lin; }
-      if (slot === 'ring') { if (rand() < 0.5) b.crit = 3; else b.critdmg = 12; b.hp = 10 * s; }
+      if (slot === 'ring') {
+        it.ringKind = pick(Object.keys(RINGS));
+        b.hp = 10 * s;
+        ({ band: () => { b.crit = 3; }, signet: () => { b.critdmg = 12; }, loop: () => { b.atk = 1.5 * s; b.matk = 1.5 * s; },
+          seal: () => { b.def = lin * 0.4; b.mres = lin * 0.6; }, coil: () => { b.spd = 3; }, ring: () => { b.eva = lin * 0.8; } })[it.ringKind]();
+      }
       if (slot === 'amulet') { b.hp = 20 * s; b.mp = 10 + pl; b.mres = lin * 0.5; }
-      it.name = `${material} ${pick(ITEM_NAMES[slot])}`;
+      it.name = `${material} ${slot === 'ring' ? RINGS[it.ringKind].name : pick(ITEM_NAMES[slot])}`;
       if (job && JOB_ARMOR_SLOTS.includes(slot)) {
         const J = JOBS[job];
         it.job = job;

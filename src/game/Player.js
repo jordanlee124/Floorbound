@@ -4,7 +4,7 @@ import { CharacterClass } from './CharacterClass.js';
 import { Skill } from './Skill.js';
 import { expToLevel, POINTS_PER_LEVEL } from './curves.js';
 import { clamp } from './util.js';
-import { SLOTS, WEAPONS } from './data/items.js';
+import { SLOTS, SLOT_TYPE, WEAPONS } from './data/items.js';
 import { CLASS_DEFS, SP_PER_LEVEL } from './data/classes.js';
 import { CUBES } from './data/potentials.js';
 import { SETS } from './data/sets.js';
@@ -236,13 +236,32 @@ export class Player {
   canEquip(it) { return !it.job || it.job === this.job || (!this.job && it.ilvl < 10); }
   get bagFull() { return this.inv.length >= BAG_SIZE; }
   findItem(id) { return this.inv.find(x => x.id === id) || SLOTS.map(s => this.equip[s]).find(x => x && x.id === id); }
-  isEquipped(item) { return this.equip[item.slot] === item; }
+  // The equip slot an item is in, or undefined.
+  equippedAt(item) { return SLOTS.find(s => this.equip[s] === item); }
+  isEquipped(item) { return !!this.equippedAt(item); }
+  // Equip slots that take this item's type (four for rings).
+  slotsFor(item) { return SLOTS.filter(s => SLOT_TYPE[s] === item.slot); }
+  // Whether the item may go into this slot: right type, right class, and never two rings of the same kind.
+  canEquipAt(item, slot, equip = this.equip) {
+    if (SLOT_TYPE[slot] !== item.slot || !this.canEquip(item)) return false;
+    return item.slot !== 'ring' || !SLOTS.some(s => s !== slot && SLOT_TYPE[s] === 'ring' && equip[s] && equip[s] !== item && equip[s].ringKind === item.ringKind);
+  }
+  // Where Equip puts an item: the ring of the same kind, else an empty ring slot; null when the player must pick a ring to replace.
+  equipTarget(item) {
+    const ok = this.slotsFor(item).filter(s => this.canEquipAt(item, s));
+    if (item.slot !== 'ring') return ok[0] || null;
+    return ok.find(s => this.equip[s] && this.equip[s].ringKind === item.ringKind) || ok.find(s => !this.equip[s]) || null;
+  }
 
-  equipItem(id) {
-    const i = this.inv.findIndex(x => x.id === id); if (i < 0 || !this.canEquip(this.inv[i])) return null;
-    const it = this.inv[i]; this.inv.splice(i, 1);
-    if (this.equip[it.slot]) this.inv.push(this.equip[it.slot]);
-    this.equip[it.slot] = it;
+  // Equip from the bag into `slot` (default: equipTarget). Whatever was there goes back to the bag.
+  equipItem(id, slot) {
+    const i = this.inv.findIndex(x => x.id === id); if (i < 0) return null;
+    const it = this.inv[i];
+    slot = slot || this.equipTarget(it);
+    if (!slot || !this.canEquipAt(it, slot)) return null;
+    this.inv.splice(i, 1);
+    if (this.equip[slot]) this.inv.push(this.equip[slot]);
+    this.equip[slot] = it;
     return it;
   }
   unequip(slot) {
@@ -301,10 +320,10 @@ export class Player {
   // Item sets worn: [{ id, set, count, active: [n, ...] }], where active lists the piece counts whose bonuses are on.
   // A destroyed piece does not count.
   activeSets(equip = this.equip) {
-    const counts = {};
-    for (const sl of SLOTS) { const it = equip[sl]; if (it && it.set && !it.broken) counts[it.set] = (counts[it.set] || 0) + 1; }
-    return Object.entries(counts).map(([id, count]) => {
-      const set = SETS[id];
+    const types = {}; // set id -> item types worn; several rings of one set count as one ring piece
+    for (const sl of SLOTS) { const it = equip[sl]; if (it && it.set && !it.broken) (types[it.set] ||= new Set()).add(it.slot); }
+    return Object.entries(types).map(([id, t]) => {
+      const set = SETS[id], count = t.size;
       return { id, set, count, active: Object.keys(set.bonus).map(Number).filter(n => n <= count) };
     });
   }
